@@ -1,0 +1,32 @@
+# 依赖与构建产物
+node_modules/
+dist/
+backups/
+
+# 本地配置与密钥
+.env
+.env.local
+
+# 运行时数据（SQLite / 旧版 JSON / 快照 / 日志）
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*.json
+data/*.tmp
+data/*.corrupt-*
+data/*.before-clear
+data/*.before-restore
+/*.db
+/*.db-wal
+/*.db-shm
+*.log
+
+# 验收截图（每次验收重新生成，不入库）
+/*.png
+
+# 工具本地状态
+.workbuddy/
+
+# 系统文件
+.DS_Store
+Thumbs.db

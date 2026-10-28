@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pulse · 小团队任务看板</title>
+    <meta name="description" content="面向小团队的任务跟踪与效能分析看板" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%235b5bd6'/%3E%3Cpath d='M9 20.5l4.2-9 3.1 5.4 2.1-3.4L23 20.5' stroke='white' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <div class="app" id="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 16l4.2-8 3.1 5.2 2.1-3.2L20 16" />
+            </svg>
+          </div>
+          <div class="brand-text">
+            <strong>Pulse</strong>
+            <span>团队任务看板</span>
+          </div>
+        </div>
+
+        <div class="project-switch" id="project-switch">
+          <span class="project-avatar" id="project-key">PLS</span>
+          <div class="project-meta">
+            <span class="project-name" id="project-name">加载中…</span>
+            <span class="project-sub" id="project-sub">小团队 · 5 人</span>
+          </div>
+          <svg class="chev" viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 8l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+
+        <nav class="nav" id="nav">
+          <div class="nav-group">
+            <span class="nav-label">工作区</span>
+            <a class="nav-item" href="#/board" data-view="board">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="3.5" width="4" height="13" rx="1.2"/><rect x="8" y="3.5" width="4" height="9" rx="1.2"/><rect x="13.5" y="3.5" width="4" height="11" rx="1.2"/></svg>
+              <span>看板</span>
+              <em class="nav-count" data-count="board">—</em>
+            </a>
+            <a class="nav-item" href="#/list" data-view="list">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 5.5h14M3 10h14M3 14.5h9" stroke-linecap="round"/></svg>
+              <span>列表</span>
+            </a>
+            <a class="nav-item" href="#/analytics" data-view="analytics">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3.5 16.5V9M8 16.5V4.5M12.5 16.5v-5M17 16.5V7" stroke-linecap="round"/></svg>
+              <span>分析</span>
+            </a>
+          </div>
+          <div class="nav-group">
+            <span class="nav-label">协作</span>
+            <a class="nav-item" href="#/team" data-view="team">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7.4" cy="7.6" r="2.6"/><path d="M2.8 15.4c.5-2.3 2.3-3.6 4.6-3.6s4.1 1.3 4.6 3.6" stroke-linecap="round"/><path d="M13.4 5.6a2.4 2.4 0 0 1 0 4.4M14.4 11.9c1.7.3 2.8 1.5 3.2 3.5" stroke-linecap="round"/></svg>
+              <span>团队</span>
+            </a>
+            <a class="nav-item" href="#/activity" data-view="activity">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="7"/><path d="M10 6v4.2l2.8 1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>动态</span>
+            </a>
+          </div>
+        </nav>
+
+        <div class="sidebar-foot">
+          <div class="member-stack" id="member-stack" title="查看团队成员"></div>
+          <div class="me" id="me-block" role="button" tabindex="0" title="编辑我的信息">
+            <span class="avatar avatar-sm" id="me-avatar" style="background:#5b5bd6">林</span>
+            <div class="me-text">
+              <strong id="me-name">林深</strong>
+              <span id="me-role">产品经理</span>
+            </div>
+            <span class="me-edit" aria-hidden="true">
+              <svg viewBox="0 0 20 20" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 16l.6-3.2L13 4.4a1.6 1.6 0 0 1 2.3 0l.3.3a1.6 1.6 0 0 1 0 2.3l-8.4 8.4L4 16z" stroke-linejoin="round"/><path d="M12 5.6l2.4 2.4" stroke-linecap="round"/></svg>
+            </span>
+          </div>
+        </div>
+      </aside>
+
+      <div class="main">
+        <header class="topbar">
+          <div class="topbar-left">
+            <h1 id="page-title">看板</h1>
+            <span class="pill-count" id="page-count"></span>
+          </div>
+          <div class="topbar-actions">
+            <div class="segmented" id="view-switch" role="tablist" aria-label="视图切换">
+              <a href="#/board" data-view="board" class="seg-btn" role="tab">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="3.5" width="4" height="13" rx="1.2"/><rect x="8" y="3.5" width="4" height="9" rx="1.2"/><rect x="13.5" y="3.5" width="4" height="11" rx="1.2"/></svg>
+                看板
+              </a>
+              <a href="#/list" data-view="list" class="seg-btn" role="tab">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 5.5h14M3 10h14M3 14.5h9" stroke-linecap="round"/></svg>
+                列表
+              </a>
+              <a href="#/team" data-view="team" class="seg-btn" role="tab">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7.4" cy="7.6" r="2.6"/><path d="M2.8 15.4c.5-2.3 2.3-3.6 4.6-3.6s4.1 1.3 4.6 3.6" stroke-linecap="round"/><path d="M13.4 5.6a2.4 2.4 0 0 1 0 4.4M14.4 11.9c1.7.3 2.8 1.5 3.2 3.5" stroke-linecap="round"/></svg>
+                团队
+              </a>
+            </div>
+            <button class="btn btn-ghost" id="refresh-btn" title="刷新数据">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M16 10a6 6 0 1 1-1.8-4.3M16 4v4h-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="btn btn-primary" id="new-task-btn">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 4.5v11M4.5 10h11" stroke-linecap="round"/></svg>
+              新建任务
+              <kbd>N</kbd>
+            </button>
+          </div>
+        </header>
+
+        <div class="filterbar" id="filterbar">
+          <label class="search">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="9" r="5.5"/><path d="M13.2 13.2L17 17" stroke-linecap="round"/></svg>
+            <input id="search-input" type="search" placeholder="搜索标题、编号、标签…" autocomplete="off" />
+            <kbd>⌘K</kbd>
+          </label>
+          <div class="select-wrap">
+            <select id="filter-assignee" aria-label="按负责人筛选">
+              <option value="">全部负责人</option>
+            </select>
+          </div>
+          <div class="select-wrap">
+            <select id="filter-priority" aria-label="按优先级筛选">
+              <option value="">全部优先级</option>
+            </select>
+          </div>
+          <div class="select-wrap">
+            <select id="filter-type" aria-label="按类型筛选">
+              <option value="">全部类型</option>
+            </select>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="clear-filters" hidden>清除筛选</button>
+          <button class="filter-chip" id="stale-toggle" type="button" hidden></button>
+          <div class="filter-spacer"></div>
+          <span class="sync-note" id="sync-note"></span>
+        </div>
+
+        <main class="view" id="view-root" aria-live="polite">
+          <div class="skeleton-wrap">
+            <div class="skeleton skeleton-kpi"></div>
+            <div class="skeleton skeleton-line"></div>
+            <div class="skeleton skeleton-line short"></div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
+    <aside class="drawer" id="drawer" hidden aria-label="任务详情"></aside>
+    <div class="modal-backdrop" id="modal-backdrop" hidden>
+      <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+    </div>
+    <div class="toast-stack" id="toast-stack" aria-live="assertive"></div>
+
+    <script type="module" src="/js/app.js"></script>
+  </body>
+</html>

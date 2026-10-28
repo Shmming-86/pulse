@@ -1,0 +1,50 @@
+#!/bin/sh
+# 提交前检查：暂存的 JS 必须通过语法检查，且不允许把数据库/密钥带进仓库。
+# 说明：node 不在 PATH 时跳过语法检查（避免阻塞提交），只保留敏感文件校验。
+
+set -u
+
+fail=0
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+
+# 1) 禁止提交数据库与本地环境文件（.gitignore 已挡，这里兜底防止 -f 强加）
+for f in $staged; do
+  case "$f" in
+    *.db|*.db-wal|*.db-shm|.env|.env.local|*.log)
+      echo "[pre-commit] 拒绝提交: $f"
+      fail=1
+      ;;
+  esac
+done
+
+# 2) JS 语法检查（无需依赖，node --check）
+js_files=$(printf '%s\n' "$staged" | grep -E '\.(js|mjs)$' || true)
+if [ -n "$js_files" ]; then
+  node_bin=""
+  if [ -n "${NODE_BIN:-}" ] && [ -x "${NODE_BIN}" ]; then
+    node_bin="$NODE_BIN"
+  elif command -v node >/dev/null 2>&1; then
+    node_bin=$(command -v node)
+  fi
+
+  if [ -z "$node_bin" ]; then
+    echo "[pre-commit] 未找到 node，跳过语法检查"
+  else
+    for f in $js_files; do
+      [ -f "$f" ] || continue
+      if ! "$node_bin" --check "$f" >/dev/null 2>&1; then
+        echo "[pre-commit] 语法错误: $f"
+        "$node_bin" --check "$f" || true
+        fail=1
+      fi
+    done
+  fi
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo "[pre-commit] 提交已阻止，请修复后重试（可用 git commit --no-verify 强制跳过）"
+  exit 1
+fi
+
+exit 0

@@ -1,0 +1,51 @@
+# Pulse 看板 —— 单机部署编排
+# 用法：
+#   docker compose up -d --build     # 构建并启动
+#   docker compose logs -f kanban    # 查看日志
+#   docker compose down              # 停止（数据保留在卷 kanban-data 中）
+services:
+  kanban:
+    build: .
+    image: kanban-pulse:1.0.0
+    container_name: kanban-pulse
+    restart: unless-stopped
+    ports:
+      # 宿主机端口:容器端口。只在本机访问可改为 "127.0.0.1:4173:4173"
+      - "4173:4173"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 4173
+      # 首次启动数据策略：empty=空库（含一名管理员）；demo=32 条演示任务
+      SEED_MODE: empty
+      # 有 Nginx 等反向代理在前面时改为 "true"，限流按真实客户端 IP 计数
+      TRUST_PROXY: "false"
+      # 浏览器实际访问的来源；走域名/HTTPS 后改成对应地址，多个用逗号分隔
+      CORS_ORIGINS: http://localhost:4173,http://127.0.0.1:4173
+      RATE_LIMIT_MAX: "600"
+      LOG_LEVEL: info
+      TZ: Asia/Shanghai
+    volumes:
+      # 所有业务数据都在这个卷里，升级镜像不丢数据
+      - kanban-data:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4173/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    # 日志滚动，避免长期运行占满磁盘
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  kanban-data:

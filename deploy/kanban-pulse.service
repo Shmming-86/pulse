@@ -1,0 +1,38 @@
+[Unit]
+Description=Pulse Kanban - 小团队任务看板
+Documentation=file:///opt/kanban-pulse/docs/DEPLOYMENT.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kanban
+Group=kanban
+WorkingDirectory=/opt/kanban-pulse
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=4173
+# 可选：额外配置文件（KEY=VALUE 格式），存在的变量优先级更高
+EnvironmentFile=-/opt/kanban-pulse/.env
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=3
+
+# 进程内单实例存储，优雅停机由应用自己处理
+KillSignal=SIGTERM
+TimeoutStopSec=10
+
+# 安全加固：仅数据目录可写
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/kanban-pulse/data
+
+# 日志交给 journald
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kanban-pulse
+
+[Install]
+WantedBy=multi-user.target
