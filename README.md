@@ -205,6 +205,26 @@ public/
   解包后以 `NODE_ENV=production` 冷启动验证（空库初始化、健康检查、静态页、备份/恢复脚本）
 - Docker：镜像构建成功，容器健康检查 healthy，`/api/health`、首页与空库初始化均验证通过
 
+## 版本管理约定
+
+仓库已初始化（分支 `main`），**每个功能验收通过后提交一个版本点**，便于随时回滚到上一版可用状态。
+
+```bash
+npm run snapshot -- "feat: 任务描述支持 Markdown"   # 暂存全部改动并提交，自动带版本号
+git log --oneline -5                                # 查看最近的版本点
+git tag -a v1.7.0 -m "说明"                          # 重要节点打标签
+git checkout <commit> -- public/                     # 回滚某个目录到历史版本
+```
+
+约定细则：
+
+- **一个验收点一个提交**：功能改动 + 文档 + 版本号一起提交，提交信息用 `feat/fix/docs/chore/refactor` 前缀 + 中文说明
+- **提交前自动校验**：`.githooks/pre-commit` 会对暂存的 `.js/.mjs` 跑 `node --check`，
+  并拦截 `.db/.env/.log` 等敏感文件；校验不通过直接阻止提交
+- **不入库的内容**：`data/`（SQLite 数据）、`dist/`（部署包）、`backups/`、`*.png`（验收截图）、`.env`、`.workbuddy/`
+- 行尾统一 LF 存储（`deploy/start.bat` 等 Windows 脚本保持 CRLF），见 `.gitattributes`
+- 首次克隆后如需启用钩子：`git config core.hooksPath .githooks`
+
 ## 后续可扩展
 
 - 迭代（Sprint）与里程碑视图、燃尽图
