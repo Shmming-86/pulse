@@ -3314,3 +3314,13 @@ select {
   width: 13px;
   height: 13px;
 }
+
+/* 类型胶囊内的图标：块级渲染，避免行内基线造成的上下偏移 */
+.card-type svg {
+  display: block;
+}
+
+/* 类型胶囊：图标与文字之间留 4px，12px 图标下不至于粘连 */
+.card-type {
+  gap: 4px;
+}

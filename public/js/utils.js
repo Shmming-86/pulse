@@ -84,7 +84,7 @@ export function avatarHtml(member, extraClass = '') {
 }
 
 /** 任务类型 → 图标名（新增类型时只需在这里补映射） */
-const TYPE_ICONS = { task: 'squareCheck', feature: 'sparkle', bug: 'bug', improvement: 'trend' };
+const TYPE_ICONS = { task: 'squareCheck', feature: 'sparkle', bug: 'alert', improvement: 'trend' };
 
 export function typeIconName(typeId) {
   return TYPE_ICONS[typeId] ?? 'squareCheck';
@@ -118,18 +118,23 @@ const ICONS = {
     '<path d="M4 16l.6-3.2L13 4.4a1.6 1.6 0 0 1 2.3 0l.3.3a1.6 1.6 0 0 1 0 2.3l-8.4 8.4L4 16z" stroke-linejoin="round"/><path d="M12 5.6l2.4 2.4" stroke-linecap="round"/>',
   user:
     '<circle cx="10" cy="7.2" r="3.1"/><path d="M4.4 16.2c.6-2.6 2.9-4.1 5.6-4.1s5 1.5 5.6 4.1" stroke-linecap="round"/>',
-  bug:
-    '<path d="M8 2l1.9 1.9M14.1 3.9L16 2M9 7.1V6a3 3 0 1 1 6 0v1.1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6z"/><path d="M12 20v-9"/><path d="M6.5 9C4.6 8.8 3 7.1 3 5"/><path d="M6 13H2"/><path d="M3 21c0-2.1 1.7-3.9 3.8-4"/><path d="M17.5 9c1.9-.2 3.5-1.9 3.5-4"/><path d="M22 13h-4"/><path d="M21 21c0-2.1-1.7-3.9-3.8-4"/>',
-  trend: '<path d="M22 7l-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>',
-  squareCheck:
-    '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8.4 12.4l2.6 2.6 4.6-5.2" stroke-linecap="round" stroke-linejoin="round"/>',
   mail:
     '<rect x="3" y="5" width="14" height="10" rx="2"/><path d="M3.6 6.2l6.4 4.6 6.4-4.6" stroke-linecap="round" stroke-linejoin="round"/>',
 };
 
+/** 24 栅格图标（Lucide 几何）：必须用 viewBox 24 + stroke 2，否则会被裁切 */
+const ICONS_24 = {
+  alert: '<circle cx="12" cy="12" r="9.5"/><path d="M12 7.6v5.1M12 16.2h.01"/>',
+  trend: '<path d="M22 7l-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>',
+  squareCheck: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8.4 12.4l2.6 2.6 4.6-5.2"/>',
+};
+
 export function icon(name, size = 16) {
-  const path = ICONS[name] ?? '';
-  return `<svg viewBox="0 0 20 20" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">${path}</svg>`;
+  const path24 = ICONS_24[name];
+  const path = path24 ?? ICONS[name] ?? '';
+  const box = path24 ? 24 : 20;
+  const strokeWidth = path24 ? 2 : 1.6;
+  return `<svg viewBox="0 0 ${box} ${box}" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
 }
 
 export function debounce(fn, wait = 200) {

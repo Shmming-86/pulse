@@ -1,6 +1,6 @@
 # Pulse 看板 · 部署与运维手册
 
-> 适用版本：v1.7.0 ｜ 更新日期：2026-10-22
+> 适用版本：v1.7.1 ｜ 更新日期：2026-10-22
 >
 > Pulse 看板是一个面向小团队（5~20 人）的任务跟踪与效能分析系统，对标 JIRA / Plane 的核心能力：看板拖拽、任务键、类型/优先级/估点、成员负载、累计流图与吞吐分析、**看板列自定义**。**零 npm 依赖**（SQLite 使用 Node 内置 `node:sqlite`），单进程 Node.js 即可运行，非常适合内网服务器、云主机或 NAS 部署。
 
@@ -265,7 +265,7 @@ docker compose down && docker compose up -d --build
 # 升级（裸机）
 systemctl stop kanban-pulse
 cp -r data /tmp/kanban-data-backup        # 数据先备份
-tar -xzf kanban-pulse-1.7.0.tar.gz -C /opt/kanban-pulse --strip-components=1
+tar -xzf kanban-pulse-1.7.1.tar.gz -C /opt/kanban-pulse --strip-components=1
 systemctl start kanban-pulse
 
 # 回滚：换回旧版本包重新解压启动即可；数据库 schema 通过版本化迁移管理，向前兼容
@@ -274,7 +274,7 @@ systemctl start kanban-pulse
 升级前建议先执行一次 `node scripts/backup.mjs`。
 
 **关于 schema 迁移**：启动时自动执行，日志会打印 `数据库迁移已应用`（含 version 与 name），
-例如 v1.7.0 新增任务开始时间字段 `tasks.started_at`（version=2），并自动从任务历史回填
+例如 v1.7.1 新增任务开始时间字段 `tasks.started_at`（version=2），并自动从任务历史回填
 「首次进入开始列」的时间；回填不修改原有数据，可安全重复执行。
 
 ---
