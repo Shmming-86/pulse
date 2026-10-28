@@ -10,7 +10,7 @@ import {
   typeMeta,
   updateTask,
 } from './state.js';
-import { escapeHtml, formatDateTime, icon, relativeTime } from './utils.js';
+import { escapeHtml, formatDateTime, icon, relativeTime, typeIconName } from './utils.js';
 import { renderMarkdown } from './markdown.js';
 import { toast } from './toast.js';
 import { confirmDialog } from './modal.js';
@@ -105,7 +105,9 @@ function render() {
   const labelPool = [...new Set([...state.labels, ...task.labels])];
 
   panel.innerHTML = `<header class="drawer-head">
-    <span class="type-mark" style="background:${type.color}">${escapeHtml(type.name.charAt(0))}</span>
+    <span class="card-type drawer-type" style="color:${type.color};background:${type.color}18" title="任务类型：${escapeHtml(
+      type.name,
+    )}">${icon(typeIconName(type.id), 13)}<span>${escapeHtml(type.name)}</span></span>
     <span class="drawer-key">${escapeHtml(task.key)}</span>
     <span class="chip chip-priority-${priority.id}">${escapeHtml(priority.name)}优先级</span>
     <button class="btn btn-ghost btn-sm" data-act="close" aria-label="关闭">${icon('close', 15)}</button>

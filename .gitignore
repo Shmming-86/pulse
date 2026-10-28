@@ -30,3 +30,6 @@ data/*.before-restore
 # 系统文件
 .DS_Store
 Thumbs.db
+
+# 无头浏览器临时 profile（截图验证用，勿入库）
+/.edge-profile*/

@@ -21,7 +21,7 @@ import { toast } from '../toast.js';
 import { openTaskDrawer } from '../drawer.js';
 import { openAssigneePicker } from '../assignee.js';
 import { openColumnDeleteDialog, openColumnModal } from '../modal.js';
-import { avatarHtml, dueInfo, escapeHtml, icon } from '../utils.js';
+import { avatarHtml, dueInfo, escapeHtml, icon, typeIconName } from '../utils.js';
 
 let suppressClick = false;
 let draggedId = null;
@@ -37,9 +37,9 @@ function cardHtml(task) {
 
   return `<article class="card" draggable="true" data-task-id="${task.id}">
     <div class="card-top">
-      <span class="type-mark" style="background:${type.color}" title="${escapeHtml(type.name)}">${escapeHtml(
-        type.name.charAt(0),
-      )}</span>
+      <span class="card-type" style="color:${type.color};background:${type.color}18" title="任务类型：${escapeHtml(
+        type.name,
+      )}">${icon(typeIconName(type.id), 12)}<span>${escapeHtml(type.name)}</span></span>
       <span class="card-key">${escapeHtml(task.key)}</span>
       <button class="card-avatar" data-assignee-btn="${task.id}" title="切换执行人：${escapeHtml(
         member ? `${member.name} · ${member.role}` : '未指派',

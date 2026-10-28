@@ -3263,3 +3263,54 @@ select {
 .modal-body textarea[hidden] {
   display: none;
 }
+
+/* ===== 卡片：任务类型胶囊 + 更大的执行人头像 ===== */
+.card-top {
+  gap: 7px;
+  margin-bottom: 7px;
+}
+
+.card-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 17px;
+  padding: 0 6px 0 5px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  font-weight: 620;
+  line-height: 1;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.card-type svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+}
+
+.card-avatar {
+  padding: 2px;
+  margin: -2px -2px -2px auto;
+}
+
+.card-avatar .avatar {
+  width: 26px;
+  height: 26px;
+  font-size: 10.5px;
+  box-shadow: 0 0 0 1px rgba(17, 24, 39, 0.1);
+}
+
+/* 抽屉标题行的类型胶囊（比卡片大一档） */
+.drawer-type {
+  height: 20px;
+  padding: 0 8px 0 6px;
+  font-size: 11.5px;
+  border-radius: 6px;
+}
+
+.drawer-type svg {
+  width: 13px;
+  height: 13px;
+}
