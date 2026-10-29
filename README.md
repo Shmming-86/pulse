@@ -3,6 +3,8 @@
 参考 JIRA 的任务模型与 Plane 的极简交互，为 5~10 人小团队设计的一体化任务看板：
 看板拖拽流转、列表批量查看、周维度效能分析、团队动态时间线，全部零外部依赖，`node` 直接启动。
 
+![Pulse 看板](docs/assets/board.png)
+
 ## 快速开始
 
 ```bash
@@ -13,9 +15,20 @@ npm start
 
 数据保存在 `data/kanban.db`（SQLite，WAL 模式）。首次启动若检测到旧版 `data/db.json` 会自动迁移，
 否则生成一份带 8 周历史轨迹的示例数据（32 个任务、5 位成员）。
-想恢复初始数据：`npm run reset`（需先停止服务）。
 
 自定义配置：`cp .env.example .env` 后修改端口、数据目录、CORS 白名单等。
+
+常用命令：
+
+| 命令 | 作用 |
+|------|------|
+| `npm start` | 启动服务（默认 127.0.0.1:4173） |
+| `npm run dev` | 带 `--watch` 的开发模式，改后端自动重启 |
+| `npm run reset` | 重置为示例数据（需先停服） |
+| `npm run clear` | 清空任务与成员，保留看板列 |
+| `npm run backup` / `npm run restore` | 数据库快照备份 / 恢复 |
+| `npm run package` | 构建 `dist/kanban-pulse-<版本>.tar.gz|zip` |
+| `npm run snapshot -- "feat: 说明"` | 验收后提交一个版本点（见「版本管理约定」） |
 
 ## 生产部署
 
@@ -114,6 +127,12 @@ npm run clear -- --yes                # 清空所有任务与动态（保留成�
 ## 目录结构
 
 ```
+.github/workflows/ci.yml   # CI：语法检查 → 启动冒烟 → 部署包构建
+.github/                   # （如需）Issue / PR 模板
+.githooks/pre-commit       # 提交前钩子：node --check + 敏感文件拦截
+docs/                      # 使用手册、部署手册、设计文档；配图在 docs/assets/
+deploy/                    # systemd / nginx / PM2 / Windows 启动脚本
+scripts/                   # 备份恢复、打包、快照提交、数据重置
 server/
   index.js                 # 启动、中间件编排、优雅停机（checkpoint + 关库）
   config.js                # 环境变量集中校验（启动即失败）
@@ -142,6 +161,26 @@ public/
   js/drawer.js             # 任务详情
   js/modal.js              # 新建任务、成员维护、确认弹窗
   js/charts.js             # 手写 SVG 图表
+```
+
+> 根目录的验收截图、`dist/`、`data/`、`backups/`、`.env` 均不入库（见 `.gitignore`）；
+> 需要长期保留的文档配图请放 `docs/assets/`。
+
+## 代码质量与 CI
+
+| 环节 | 内容 |
+|------|------|
+| 提交前（本地） | `.githooks/pre-commit`：对暂存的 `.js/.mjs` 跑 `node --check`，拦截 `.db/.env/.log` |
+| 持续集成 | GitHub Actions `CI`：全量 JS 语法检查 → 以临时数据目录启动服务并校验 `/api/health`、`/api/bootstrap`、`/api/analytics` → `npm run package` 构建验证 |
+| 本地等价命令 | 见下表 |
+
+```bash
+# 语法检查（与 CI 一致）
+git ls-files '*.js' '*.mjs' | while read f; do node --check "$f"; done
+
+# 启动冒烟（隔离数据，不污染 data/）
+NODE_ENV=development PORT=4199 DATA_DIR=.ci-data SEED_MODE=demo npm start &
+curl -sf http://127.0.0.1:4199/api/health
 ```
 
 ## API
@@ -225,7 +264,8 @@ git checkout <commit> -- public/                     # 回滚某个目录到历�
 - **一个验收点一个提交**：功能改动 + 文档 + 版本号一起提交，提交信息用 `feat/fix/docs/chore/refactor` 前缀 + 中文说明
 - **提交前自动校验**：`.githooks/pre-commit` 会对暂存的 `.js/.mjs` 跑 `node --check`，
   并拦截 `.db/.env/.log` 等敏感文件；校验不通过直接阻止提交
-- **不入库的内容**：`data/`（SQLite 数据）、`dist/`（部署包）、`backups/`、`*.png`（验收截图）、`.env`、`.workbuddy/`
+- **不入库的内容**：`data/`（SQLite 数据）、`dist/`（部署包）、`backups/`、根目录 `*.png`（验收截图）、`.env`、`.workbuddy/`；
+  文档配图放在 `docs/assets/` 并随文档一起入库
 - 行尾统一 LF 存储（`deploy/start.bat` 等 Windows 脚本保持 CRLF），见 `.gitattributes`
 - 首次克隆后如需启用钩子：`git config core.hooksPath .githooks`
 
@@ -241,3 +281,11 @@ git checkout <commit> -- public/                     # 回滚某个目录到历�
 
 - 数据保存在 `data/kanban.db`（SQLite），已在 `.gitignore` 中排除；`npm run reset` 可重置示例数据
 - 端口冲突时改 `.env` 里的 `PORT`；跨端调用需把来源加入 `CORS_ORIGINS`
+- 仓库暂未附带开源许可证；推送到 GitHub 前请按团队要求补 `LICENSE`（如 MIT / Apache-2.0）
+
+推送远程仓库：
+
+```bash
+git remote add origin git@github.com:<你的组织>/<仓库名>.git
+git push -u origin main --tags
+```

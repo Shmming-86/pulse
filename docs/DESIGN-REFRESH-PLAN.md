@@ -7,7 +7,7 @@
 
 ## 1. 现状诊断
 
-截图见 `before-board.png`，逐项问题与证据：
+截图见 `assets/before-board.png`，逐项问题与证据：
 
 | # | 问题 | 证据 | 影响 |
 |---|---|---|---|
@@ -179,7 +179,7 @@
 | 图标替换遗漏调用点 | `icon()` 签名不变；`grep "icon('"` 全量核对 |
 | 尺寸变大挤压卡片高度 | meta 行固定 18px 行高，图标 13px，卡片 padding 收紧 1px 抵消 |
 | 对比度改动影响整体质感 | 仅改 `--text-2/--text-3` 两档，先在一屏验证再全站 |
-| 视觉回归无自动化 | 保留 `before-board.png` 基线，改造后同分辨率截图逐屏比对 |
+| 视觉回归无自动化 | 保留 `assets/before-board.png` 基线，改造后同分辨率截图逐屏比对 |
 | 破坏零依赖 | 图标以字符串常量内联，不引 `lucide` npm 包与 CDN |
 
 ---
@@ -187,6 +187,6 @@
 ## 8. 交付物
 
 - `docs/design-preview.html` —— 可交互预览（图标对照 + 改造后看板全貌）
-- `design-preview.png` —— 预览截图
+- `assets/design-preview.png` —— 预览截图
 - 本方案文档
 - 待确认后：P0 实施提交（`feat: 图标体系升级为 Lucide 24 栅格`）

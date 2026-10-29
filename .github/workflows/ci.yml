@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: 语法检查 + 启动冒烟
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # 项目零 npm 依赖，因此不需要 install 步骤
+      - name: 校验 Node 版本
+        run: node -v
+
+      - name: JS 语法检查
+        run: |
+          set -euo pipefail
+          files=$(git ls-files '*.js' '*.mjs')
+          count=0
+          for f in $files; do
+            node --check "$f"
+            count=$((count + 1))
+          done
+          echo "语法检查通过：${count} 个文件"
+
+      - name: 启动冒烟（健康检查 + 首屏数据）
+        env:
+          NODE_ENV: development
+          HOST: 127.0.0.1
+          PORT: '4199'
+          DATA_DIR: .ci-data
+          SEED_MODE: demo
+        run: |
+          set -euo pipefail
+          node server/index.js > .ci-server.log 2>&1 &
+          echo $! > .ci-server.pid
+
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:4199/api/health > /dev/null; then break; fi
+            sleep 1
+          done
+
+          echo "--- health ---"
+          curl -sf http://127.0.0.1:4199/api/health
+
+          echo "--- bootstrap ---"
+          curl -sf http://127.0.0.1:4199/api/bootstrap > .ci-bootstrap.json
+          node -e "
+            const data = require('./.ci-bootstrap.json').data;
+            if (!Array.isArray(data.tasks) || data.tasks.length === 0) {
+              console.error('bootstrap 返回的任务为空');
+              process.exit(1);
+            }
+            if (!Array.isArray(data.columns) || data.columns.length === 0) {
+              console.error('bootstrap 返回的看板列为空');
+              process.exit(1);
+            }
+            console.log('bootstrap ok:', data.tasks.length, 'tasks /', data.columns.length, 'columns');
+          "
+
+          echo "--- analytics ---"
+          curl -sf http://127.0.0.1:4199/api/analytics > .ci-analytics.json
+          node -e "
+            const data = require('./.ci-analytics.json').data;
+            if (!data.kpi || !Array.isArray(data.memberWeekly.members)) process.exit(1);
+            console.log('analytics ok: kpi +', data.memberWeekly.members.length, 'members');
+          "
+
+          kill "$(cat .ci-server.pid)"
+
+      - name: 部署包构建验证
+        run: node scripts/build-package.mjs
+
+      - name: 失败时输出服务日志
+        if: failure()
+        run: cat .ci-server.log || true
