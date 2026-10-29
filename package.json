@@ -1,6 +1,6 @@
 {
   "name": "kanban-pulse",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "private": true,
   "type": "module",
   "description": "小团队任务跟踪与分析看板（JIRA / Plane 风格）",
@@ -17,5 +17,6 @@
     "restore": "node scripts/restore.mjs",
     "package": "node scripts/build-package.mjs",
     "snapshot": "bash scripts/snapshot.sh"
-  }
+  },
+  "license": "Apache-2.0"
 }

@@ -35,6 +35,8 @@ const INCLUDE_FILES = [
   '.gitignore',
   '.env.example',
   '.env.production.example',
+  'LICENSE',
+  'NOTICE',
 ];
 const INCLUDE_DIRS = ['server', 'public', 'deploy', 'docs'];
 const INCLUDE_SCRIPTS = ['scripts/reset.js', 'scripts/clear.js', 'scripts/backup.mjs', 'scripts/restore.mjs'];
@@ -47,7 +49,16 @@ function copyIncluded() {
   for (const dir of INCLUDE_DIRS) {
     const src = path.join(root, dir);
     if (!existsSync(src)) throw new Error(`缺少目录 ${dir}`);
-    cpSync(src, path.join(staging, dir), { recursive: true });
+    // 文档配图与设计稿只服务仓库阅读，不进部署包（否则体积翻数倍）
+    cpSync(src, path.join(staging, dir), {
+      recursive: true,
+      filter: (from) => {
+        const rel = path.relative(root, from).split(path.sep).join('/');
+        if (rel.startsWith('docs/assets')) return false;
+        if (rel === 'docs/design-preview.html') return false;
+        return true;
+      },
+    });
   }
   mkdirSync(path.join(staging, 'scripts'), { recursive: true });
   for (const file of INCLUDE_SCRIPTS) {

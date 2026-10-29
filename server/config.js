@@ -68,7 +68,7 @@ const seedMode = (process.env.SEED_MODE || (env === 'production' ? 'empty' : 'de
 const config = {
   env,
   isProd: env === 'production',
-  version: '1.7.1',
+  version: '1.7.2',
   host: process.env.HOST || '127.0.0.1',
   port: readInt('PORT', 4173, { min: 1, max: 65535 }),
   dataDir: path.resolve(ROOT, process.env.DATA_DIR || 'data'),

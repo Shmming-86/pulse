@@ -281,11 +281,16 @@ git checkout <commit> -- public/                     # 回滚某个目录到历�
 
 - 数据保存在 `data/kanban.db`（SQLite），已在 `.gitignore` 中排除；`npm run reset` 可重置示例数据
 - 端口冲突时改 `.env` 里的 `PORT`；跨端调用需把来源加入 `CORS_ORIGINS`
-- 仓库暂未附带开源许可证；推送到 GitHub 前请按团队要求补 `LICENSE`（如 MIT / Apache-2.0）
-
 推送远程仓库：
 
 ```bash
 git remote add origin git@github.com:<你的组织>/<仓库名>.git
 git push -u origin main --tags
 ```
+
+## 许可证
+
+本项目采用 [Apache License 2.0](LICENSE) 授权，版权归属见 [NOTICE](NOTICE)。
+
+- 允许商用、修改、分发与专利授权；分发时须保留 `LICENSE` 与 `NOTICE`，并标明修改过的文件
+- 如调整版权主体，改 `NOTICE` 里的 `Copyright` 行即可，`LICENSE` 原文无需改动
