@@ -130,7 +130,7 @@ npm run clear -- --yes                # 清空所有任务与动态（保留成�
 .github/workflows/ci.yml   # CI：语法检查 → 启动冒烟 → 部署包构建
 .github/                   # （如需）Issue / PR 模板
 .githooks/pre-commit       # 提交前钩子：node --check + 敏感文件拦截
-docs/                      # 使用手册、部署手册、设计文档；配图在 docs/assets/
+docs/                      # 使用手册、部署手册、开发工作流、设计文档；配图在 docs/assets/
 deploy/                    # systemd / nginx / PM2 / Windows 启动脚本
 scripts/                   # 备份恢复、打包、快照提交、数据重置
 server/
@@ -248,26 +248,41 @@ curl -sf http://127.0.0.1:4199/api/health
   解包后以 `NODE_ENV=production` 冷启动验证（空库初始化、健康检查、静态页、备份/恢复脚本）
 - Docker：镜像构建成功，容器健康检查 healthy，`/api/health`、首页与空库初始化均验证通过
 
-## 版本管理约定
+## 开发与版本管理
 
-仓库已初始化（分支 `main`），**每个功能验收通过后提交一个版本点**，便于随时回滚到上一版可用状态。
+仓库地址：<https://github.com/Shmming-86/pulse>，主分支 `main` 始终保持可发布状态。
+**每次开发都在独立的 git worktree 中进行，验收通过后合并回 `main` 并自动提交、推送。**
+完整流程见 [docs/WORKFLOW.md](docs/WORKFLOW.md)。
 
 ```bash
-npm run snapshot -- "feat: 任务描述支持 Markdown"   # 暂存全部改动并提交，自动带版本号
-git log --oneline -5                                # 查看最近的版本点
-git tag -a v1.7.0 -m "说明"                          # 重要节点打标签
-git checkout <commit> -- public/                     # 回滚某个目录到历史版本
+# ① 新建工作树（从最新 main 切出，目录在仓库同级 pulse-worktrees/ 下）
+bash scripts/worktree.sh start feat/task-templates
+cd ../pulse-worktrees/feat-task-templates
+
+# ② 开发、自测后提交并推送功能分支
+npm run snapshot -- "feat: 任务模板"
+
+# ③ 验收通过：合并回 main、推送、清理工作树
+cd /d/work/kanban
+bash scripts/worktree.sh finish feat/task-templates "feat: 任务模板 (v1.8.0)"
+
+# ④ 需要发布点时打标签
+git tag -a v1.8.0 -m "说明" && git push origin v1.8.0
 ```
 
 约定细则：
 
-- **一个验收点一个提交**：功能改动 + 文档 + 版本号一起提交，提交信息用 `feat/fix/docs/chore/refactor` 前缀 + 中文说明
+- **一功能一工作树**：分支用 `feat/fix/chore/refactor/docs/` 前缀，工作树放仓库同级的 `pulse-worktrees/`，不污染仓库目录
+- **验收即提交即推送**：`npm run snapshot` 自动带版本号提交，并推送到 `origin` 的同名分支；
+  加 `--no-push` 可只提交不推送
+- **合并即发布**：`scripts/worktree.sh finish` 做 `merge --no-ff` + `push origin main` + 删工作树，
+  合并前会校验功能分支与主工作区都没有未提交改动
 - **提交前自动校验**：`.githooks/pre-commit` 会对暂存的 `.js/.mjs` 跑 `node --check`，
   并拦截 `.db/.env/.log` 等敏感文件；校验不通过直接阻止提交
 - **不入库的内容**：`data/`（SQLite 数据）、`dist/`（部署包）、`backups/`、根目录 `*.png`（验收截图）、`.env`、`.workbuddy/`；
   文档配图放在 `docs/assets/` 并随文档一起入库
 - 行尾统一 LF 存储（`deploy/start.bat` 等 Windows 脚本保持 CRLF），见 `.gitattributes`
-- 首次克隆后如需启用钩子：`git config core.hooksPath .githooks`
+- 首次克隆后启用钩子：`git config core.hooksPath .githooks`
 
 ## 后续可扩展
 
@@ -281,11 +296,11 @@ git checkout <commit> -- public/                     # 回滚某个目录到历�
 
 - 数据保存在 `data/kanban.db`（SQLite），已在 `.gitignore` 中排除；`npm run reset` 可重置示例数据
 - 端口冲突时改 `.env` 里的 `PORT`；跨端调用需把来源加入 `CORS_ORIGINS`
-推送远程仓库：
+远程仓库已配置为 `origin`（<https://github.com/Shmming-86/pulse>）：
 
 ```bash
-git remote add origin git@github.com:<你的组织>/<仓库名>.git
-git push -u origin main --tags
+git push origin main --tags      # 补推主分支与所有版本标签
+git fetch --all --tags           # 换机后拉取最新代码与标签
 ```
 
 ## 许可证
