@@ -79,7 +79,7 @@ async function request(method, path, body, { retries = method === 'GET' ? 3 : 0 
 
 export const api = {
   bootstrap: () => request('GET', '/api/bootstrap'),
-  analytics: () => request('GET', '/api/analytics'),
+  analytics: (weeks) => request('GET', weeks ? `/api/analytics?weeks=${weeks}` : '/api/analytics'),
   activity: (limit = 60) => request('GET', `/api/activity?limit=${limit}`),
   createTask: (payload) => request('POST', '/api/tasks', payload),
   updateTask: (id, patch) => request('PATCH', `/api/tasks/${id}`, patch),

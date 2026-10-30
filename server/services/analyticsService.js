@@ -2,7 +2,14 @@ import { difficultyWeight, PRIORITIES, TYPES } from '../domain.js';
 
 const DAY = 86_400_000;
 const WEEK = 7 * DAY;
-const WEEK_COUNT = 8;
+/** 分析窗口允许的周数（前端 4/8/12 周切换） */
+const WEEK_RANGE = [4, 8, 12];
+const WEEK_COUNT_DEFAULT = 8;
+
+const normalizeWeeks = (value) => {
+  const n = Number(value);
+  return WEEK_RANGE.includes(n) ? n : WEEK_COUNT_DEFAULT;
+};
 
 function startOfDay(ms) {
   const d = new Date(ms);
@@ -71,7 +78,9 @@ const round1 = (n) => Math.round(n * 10) / 10;
 
 export function createAnalyticsService({ tasks, members, columns }) {
   return {
-    overview() {
+    /** @param {{ weeks?: number }} options 统计窗口周数，可选 4 / 8 / 12，默认 8 */
+    overview(options = {}) {
+      const weekCount = normalizeWeeks(options.weeks);
       const now = Date.now();
       const today = startOfDay(now);
       const rows = tasks.list();
@@ -110,6 +119,14 @@ export function createAnalyticsService({ tasks, members, columns }) {
       const completedThisWeek = done.filter(
         (task) => task.completedAt && new Date(task.completedAt).getTime() >= thisWeekStart,
       ).length;
+      // 上周同期：上周一 00:00 起、到与今天相同的「已过时长」为止，用于同口径环比
+      const elapsedInWeek = now - thisWeekStart;
+      const lastWeekToDateEnd = lastWeekStart + elapsedInWeek;
+      const completedLastWeekToDate = done.filter((task) => {
+        if (!task.completedAt) return false;
+        const ts = new Date(task.completedAt).getTime();
+        return ts >= lastWeekStart && ts < lastWeekToDateEnd;
+      }).length;
       const completedLastWeek = done.filter((task) => {
         if (!task.completedAt) return false;
         const ts = new Date(task.completedAt).getTime();
@@ -130,7 +147,7 @@ export function createAnalyticsService({ tasks, members, columns }) {
         });
 
       const weeks = [];
-      for (let i = WEEK_COUNT - 1; i >= 0; i -= 1) {
+      for (let i = weekCount - 1; i >= 0; i -= 1) {
         const start = thisWeekStart - i * WEEK;
         weeks.push({
           start,
@@ -337,6 +354,7 @@ export function createAnalyticsService({ tasks, members, columns }) {
           completionRate: total ? round1((doneCount / total) * 100) : 0,
           completedThisWeek,
           completedLastWeek,
+          completedLastWeekToDate,
           overdue: overdue.length,
           avgCycle: round1(avgCycle),
           medianCycle: round1(median(cycleTimes)),

@@ -21,6 +21,7 @@ export const state = {
   labels: [],
   meta: { columns: [], statuses: [], priorities: [], types: [], memberColors: [], columnTones: [] },
   analytics: null,
+  analyticsWeeks: 8,
   analyticsFetchedAt: 0,
   filters: { q: '', assigneeId: '', priority: '', type: '' },
   /** 看板视图专属显示偏好（列表视图始终展示全部任务） */
@@ -268,10 +269,28 @@ export async function refreshData() {
   emit();
 }
 
+/** 分析看板可选的时间窗口（周） */
+export const ANALYTICS_RANGES = [4, 8, 12];
+
+export function analyticsRange() {
+  return ANALYTICS_RANGES.includes(state.analyticsWeeks) ? state.analyticsWeeks : 8;
+}
+
+/** 切换时间窗口：清空缓存 → 重新拉取 → 触发重渲染 */
+export async function setAnalyticsRange(weeks) {
+  const value = ANALYTICS_RANGES.includes(Number(weeks)) ? Number(weeks) : 8;
+  if (value === analyticsRange() && state.analytics) return;
+  state.analyticsWeeks = value;
+  state.analytics = null;
+  state.analyticsFetchedAt = 0;
+  emit();
+  await loadAnalytics({ force: true });
+}
+
 export async function loadAnalytics({ force = false } = {}) {
   if (!force && state.analytics && Date.now() - state.analyticsFetchedAt < 15_000) return;
   try {
-    const data = await api.analytics();
+    const data = await api.analytics(analyticsRange());
     state.analytics = data;
     state.analyticsFetchedAt = Date.now();
     emit();

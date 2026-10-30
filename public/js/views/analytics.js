@@ -1,4 +1,13 @@
-import { difficultyMeta, isDoneStatus, memberById, state, statusMeta } from '../state.js';
+import {
+  ANALYTICS_RANGES,
+  analyticsRange,
+  difficultyMeta,
+  isDoneStatus,
+  memberById,
+  setAnalyticsRange,
+  state,
+  statusMeta,
+} from '../state.js';
 import { avatarHtml, escapeHtml } from '../utils.js';
 import {
   donutChart,
@@ -9,6 +18,7 @@ import {
   stackedAreaChart,
 } from '../charts.js';
 import { openTaskDrawer } from '../drawer.js';
+import { toast } from '../toast.js';
 import { openDetailModal } from '../modal.js';
 
 /**
@@ -112,9 +122,14 @@ function deltaFoot(current, previous, unit = '个') {
     : `<span class="an-down">▼ ${Math.abs(diff)}${unit}（-${pct}%）</span>`;
 }
 
-function kpiCard({ id, label, value, unit = '', foot = '', spark = '', ring = '', tone = '' }) {
+function kpiCard({ id, label, value, unit = '', foot = '', spark = '', ring = '', tone = '', hint = '' }) {
+  const info = hint
+    ? `<span class="an-kpi-info" role="img" aria-label="口径说明：${escapeHtml(
+        hint,
+      )}" data-hint="${escapeHtml(hint)}">?</span>`
+    : '';
   return `<button type="button" class="an-kpi ${tone}" data-detail="${id}">
-    <span class="an-kpi-label">${label}</span>
+    <span class="an-kpi-label">${label}${info}</span>
     <span class="an-kpi-value">${value}${unit ? `<em>${unit}</em>` : ''}</span>
     <span class="an-kpi-foot">${foot}</span>
     ${ring ? `<span class="an-kpi-ring">${ring}</span>` : ''}
@@ -123,7 +138,7 @@ function kpiCard({ id, label, value, unit = '', foot = '', spark = '', ring = ''
 }
 
 function weekHeader(weeks) {
-  return `<div class="an-heat-head"><span></span>${weeks
+  return `<div class="an-heat-head" style="grid-template-columns:34px repeat(${weeks.length},1fr)"><span></span>${weeks
     .map((week) => `<span>${escapeHtml(week.label)}</span>`)
     .join('')}</div>`;
 }
@@ -203,7 +218,7 @@ export function renderAnalytics(root) {
     ${weekHeader(weeks)}
     ${weeklyMembers
       .map(
-        (row) => `<div class="an-heat-row">
+        (row) => `<div class="an-heat-row" style="grid-template-columns:34px repeat(${weeks.length},1fr)">
           <span class="an-heat-name" title="${escapeHtml(row.name)}">${escapeHtml(row.name.slice(0, 2))}</span>
           ${row.weeks
             .map((cell, index) => {
@@ -272,15 +287,25 @@ export function renderAnalytics(root) {
           data.generatedAt,
         )} · 点击卡片或图元查看明细</div>
       </div>
-      <div class="an-legend">
-        ${(data.byType ?? [])
-          .map(
-            (item) =>
-              `<span class="an-legend-item"><i style="background:${item.color}"></i>${escapeHtml(
-                item.name,
-              )} ${item.count}</span>`,
-          )
-          .join('')}
+      <div class="an-tools">
+        <div class="an-range" role="group" aria-label="统计时间范围">
+          ${ANALYTICS_RANGES.map(
+            (value) =>
+              `<button type="button" class="an-range-btn ${
+                value === analyticsRange() ? 'on' : ''
+              }" data-range="${value}" aria-pressed="${value === analyticsRange()}">${value} 周</button>`,
+          ).join('')}
+        </div>
+        <div class="an-legend">
+          ${(data.byType ?? [])
+            .map(
+              (item) =>
+                `<span class="an-legend-item"><i style="background:${item.color}"></i>${escapeHtml(
+                  item.name,
+                )} ${item.count}</span>`,
+            )
+            .join('')}
+        </div>
       </div>
     </header>
 
@@ -290,8 +315,12 @@ export function renderAnalytics(root) {
         label: '本周完成',
         value: kpi.completedThisWeek,
         unit: '个',
-        foot: deltaFoot(kpi.completedThisWeek, kpi.completedLastWeek),
+        foot: `${deltaFoot(
+          kpi.completedThisWeek,
+          kpi.completedLastWeekToDate ?? kpi.completedLastWeek,
+        )}<span class="an-kpi-note">较上周同期</span>`,
         spark: sparkline(throughput.map((row) => row.completed ?? 0), { color: '#5b5bd6' }),
+        hint: '本周一 00:00 至当前完成的任务数；环比对比「上周同一时段」，避免周中与整周比较失真',
       })}
       ${kpiCard({
         id: 'wip',
@@ -299,6 +328,7 @@ export function renderAnalytics(root) {
         value: kpi.inProgress,
         unit: '个',
         foot: `未完成共 ${kpi.open} 个`,
+        hint: '当前不在完成列的任务数；卡片同名指标「进行中」只统计看板里的开始列',
       })}
       ${kpiCard({
         id: 'cycle',
@@ -310,6 +340,7 @@ export function renderAnalytics(root) {
           throughput.map((row) => row.avgCycle ?? 0).filter((value) => value > 0),
           { color: '#0d9488' },
         ),
+        hint: '从任务首次进入开始列到完成的天数平均；副标为中位数与样本量，样本取窗口内已完成任务',
       })}
       ${kpiCard({
         id: 'completion',
@@ -318,6 +349,7 @@ export function renderAnalytics(root) {
         unit: '%',
         foot: `累计 ${kpi.total - kpi.open}/${kpi.total}`,
         ring: ringProgress(kpi.completionRate, { size: 44, thickness: 5 }),
+        hint: '已完成 ÷ 全部任务；累计口径，不随上方时间窗口变化',
       })}
       ${kpiCard({
         id: 'overdue',
@@ -326,6 +358,7 @@ export function renderAnalytics(root) {
         unit: '个',
         tone: kpi.overdue ? 'danger' : '',
         foot: kpi.overdue ? `最长逾期 ${maxLate} 天` : '当前无逾期',
+        hint: '未完成且截止日期早于今天的任务；最长逾期按最早到期的那个任务计算',
       })}
       ${kpiCard({
         id: 'points',
@@ -333,6 +366,7 @@ export function renderAnalytics(root) {
         value: kpi.wipPoints,
         unit: '分',
         foot: `平均交付 ${kpi.avgLead} 天`,
+        hint: '未完成任务按难度加权求和：简单 1 / 一般 2 / 较难 3 / 困难 5，未评估记 0',
       })}
     </section>
 
@@ -434,6 +468,16 @@ function bindInteractions(root, ctx) {
   const { data, weeks, doneThisWeek, doneLastWeek, overdueRows, openRows, exceededCols, atLimitCols } = ctx;
 
   root.addEventListener('click', (event) => {
+    const rangeBtn = event.target.closest('[data-range]');
+    if (rangeBtn) {
+      event.stopPropagation();
+      const value = Number(rangeBtn.dataset.range);
+      if (value !== analyticsRange()) {
+        setAnalyticsRange(value).catch((error) => toast(error.message, 'error'));
+      }
+      return;
+    }
+
     const riskTask = event.target.closest('[data-risk-task]');
     if (riskTask) {
       event.stopPropagation();
