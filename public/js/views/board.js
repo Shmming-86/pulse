@@ -27,6 +27,8 @@ import { avatarHtml, dueInfo, escapeHtml, icon, typeIconName } from '../utils.js
 let suppressClick = false;
 let draggedId = null;
 let columnDragId = null;
+let columnDragTarget = null;
+let columnDragStartX = null;
 let menuEl = null;
 let menuCleanup = null;
 
@@ -144,14 +146,46 @@ function animateColumnReorder(root, prevRects) {
   }, 420);
 }
 
-function clearColumnDropMarks(root) {
-  root.querySelectorAll('.column').forEach((col) => col.classList.remove('drop-before', 'drop-after'));
+/** 拖动中：其余列按「新位置 - 旧位置」平移一格，给目标位置腾出空档 */
+function previewColumnGap(cols, source, insert) {
+  const first = cols[0];
+  const second = cols[1];
+  if (!first) return;
+  const step = second ? second.offsetLeft - first.offsetLeft : first.offsetWidth + 12;
+  const sourceIndex = cols.indexOf(source);
+
+  let m = 0;
+  cols.forEach((col) => {
+    if (col === source) return;
+    const finalIndex = m < insert ? m : m + 1;
+    const oldIndex = m < sourceIndex ? m : m + 1;
+    const offset = (finalIndex - oldIndex) * step;
+    col.style.transition = 'transform 200ms cubic-bezier(0.32, 0.72, 0, 1)';
+    col.style.transform = offset ? `translateX(${offset}px)` : '';
+    m += 1;
+  });
+}
+
+/** 撤销临时位移（取消拖拽或落位后重绘前调用） */
+function resetColumnGaps(root) {
+  columnDragTarget = null;
+  root.querySelectorAll('.column').forEach((col) => {
+    col.style.transition = 'transform 200ms cubic-bezier(0.32, 0.72, 0, 1)';
+    col.style.transform = '';
+    window.setTimeout(() => {
+      col.style.transition = '';
+    }, 240);
+  });
 }
 
 function clearColumnDrag(root) {
   columnDragId = null;
-  clearColumnDropMarks(root);
-  root.querySelectorAll('.column').forEach((col) => col.classList.remove('col-dragging'));
+  columnDragTarget = null;
+  columnDragStartX = null;
+  root.querySelectorAll('.column').forEach((col) => {
+    col.classList.remove('col-dragging');
+    col.style.transform = '';
+  });
 }
 
 function columnHtml(column) {
@@ -343,9 +377,19 @@ function bind(root) {
           return;
         }
         columnDragId = head.dataset.colId;
+        columnDragStartX = event.clientX;
         head.closest('.column')?.classList.add('col-dragging');
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', `column:${columnDragId}`);
+        // 隐藏浏览器自带的半透明拖影：列本身会跟着指针浮动，两套影像会重影
+        const blank = document.createElement('canvas');
+        blank.width = 1;
+        blank.height = 1;
+        try {
+          event.dataTransfer.setDragImage(blank, 0, 0);
+        } catch {
+          /* 少数浏览器不支持时忽略，退化为原生拖影 */
+        }
         return;
       }
 
@@ -361,6 +405,11 @@ function bind(root) {
       const card = event.target.closest('.card');
       card?.classList.remove('dragging');
       root.querySelectorAll('.column').forEach((col) => col.classList.remove('drag-over'));
+      if (columnDragId) {
+        // 拖拽被取消（没落在列上）：撤销让位并按服务端顺序重绘
+        resetColumnGaps(root);
+        renderBoard(root);
+      }
       clearColumnDrag(root);
       draggedId = null;
       suppressClick = true;
@@ -370,59 +419,72 @@ function bind(root) {
     });
   }
 
-  // ---------- 列拖拽排序 ----------
+  // ---------- 列拖拽排序（拖动中其它列实时让位，松手落位） ----------
   root.addEventListener('dragover', (event) => {
     if (!columnDragId) return;
-    const column = event.target.closest('.column');
-    const addTile = event.target.closest('.column-add-tile');
-    if (!column && !addTile) return;
+    const board = root.querySelector('.board');
+    if (!board) return;
+    const cols = Array.from(board.querySelectorAll('.column'));
+    const source = cols.find((col) => col.dataset.status === columnDragId);
+    if (!source) return;
     event.preventDefault();
 
-    clearColumnDropMarks(root);
-    if (!column) {
-      root.querySelector('.board .column:last-of-type')?.classList.add('drop-after');
-      return;
+    // 重渲染可能冲掉拖拽样式，这里补一次保证拖动视觉不中断
+    source.classList.add('col-dragging');
+
+    // 插入点用布局坐标（offsetLeft，不受 transform 影响）判断，避免让位后反复抖动
+    const boardRect = board.getBoundingClientRect();
+    const pointerX = event.clientX - boardRect.left + board.scrollLeft;
+    const others = cols.filter((col) => col !== source);
+    let insert = others.length;
+    for (let i = 0; i < others.length; i += 1) {
+      const mid = others[i].offsetLeft + others[i].offsetWidth / 2;
+      if (pointerX < mid) {
+        insert = i;
+        break;
+      }
     }
-    if (column.dataset.status === columnDragId) return;
-    const rect = column.getBoundingClientRect();
-    column.classList.add(event.clientX > rect.left + rect.width / 2 ? 'drop-after' : 'drop-before');
+    columnDragTarget = insert;
+
+    // 列吸附到目标空档（而不是跟着指针飘），避免遮挡相邻列
+    const step = others[0] && others[1] ? others[1].offsetLeft - others[0].offsetLeft : source.offsetWidth + 12;
+    const fromIndex = cols.indexOf(source);
+    const dx = (insert - fromIndex) * step;
+    source.style.transition = columnDragStartX === null
+      ? 'none'
+      : 'transform 200ms cubic-bezier(0.32, 0.72, 0, 1)';
+    source.style.transform = `translateX(${dx}px) scale(1.03)`;
+    columnDragStartX = 1; // 首次之后启用过渡
+
+    previewColumnGap(cols, source, insert);
   });
 
   root.addEventListener('drop', (event) => {
     if (!columnDragId) return;
-    const column = event.target.closest('.column');
-    const addTile = event.target.closest('.column-add-tile');
-    if (!column && !addTile) return;
+    const board = root.querySelector('.board');
+    if (!board) return;
     event.preventDefault();
 
     const movingId = columnDragId;
+    const insert = columnDragTarget;
+    const from = columns().findIndex((item) => item.id === movingId);
     const prevRects = new Map();
-    root.querySelectorAll('.column').forEach((col) => {
+    board.querySelectorAll('.column').forEach((col) => {
       prevRects.set(col.dataset.status, col.getBoundingClientRect());
     });
-    const ids = columns().map((item) => item.id);
-    const from = ids.indexOf(movingId);
-    if (from === -1) {
-      clearColumnDrag(root);
+
+    resetColumnGaps(root);
+    clearColumnDrag(root);
+    if (insert === null || from === -1 || insert === from) {
+      renderBoard(root); // 位置没变：重绘清掉临时位移
       return;
     }
-    ids.splice(from, 1);
-
-    let insert = ids.length; // 落在「添加列」区域 → 排到最末
-    if (column) {
-      const targetIndex = ids.indexOf(column.dataset.status);
-      if (targetIndex === -1) {
-        clearColumnDrag(root);
-        return;
-      }
-      insert = column.classList.contains('drop-after') ? targetIndex + 1 : targetIndex;
-    }
-
-    clearColumnDrag(root);
-    if (insert === from) return; // 位置没变，不做请求
     moveColumn(movingId, insert)
       .then(() => animateColumnReorder(root, prevRects))
-      .catch((error) => toast(error.message, 'error'));
+      .catch((error) => {
+        toast(error.message, 'error');
+        renderBoard(root);
+      });
   });
 
   root.querySelectorAll('.card-list').forEach((list) => {
