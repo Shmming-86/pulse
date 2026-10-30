@@ -26,6 +26,7 @@ import { avatarHtml, dueInfo, escapeHtml, icon, typeIconName } from '../utils.js
 
 let suppressClick = false;
 let draggedId = null;
+let columnDragId = null;
 let menuEl = null;
 let menuCleanup = null;
 
@@ -115,24 +116,37 @@ function cardHtml(task) {
   </article>`;
 }
 
+function clearColumnDropMarks(root) {
+  root.querySelectorAll('.column').forEach((col) => col.classList.remove('drop-before', 'drop-after'));
+}
+
+function clearColumnDrag(root) {
+  columnDragId = null;
+  clearColumnDropMarks(root);
+  root.querySelectorAll('.column').forEach((col) => col.classList.remove('col-dragging'));
+}
+
 function columnHtml(column) {
   const tasks = boardTasksByStatus(column.id);
   const hidden = column.isDone ? hiddenStaleTasks().filter((task) => task.status === column.id).length : 0;
   const over = column.wipLimit && tasks.length > column.wipLimit;
   return `<section class="column" data-status="${column.id}">
-    <header class="col-head">
+    <header class="col-head" draggable="true" data-col-id="${column.id}" title="拖动列头可调整列顺序">
+      <span class="col-grip" aria-hidden="true">${icon('grip', 14)}</span>
       <span class="col-dot ${column.tone}"></span>
       <span class="col-name" title="${column.isDone ? '完成列' : column.isStart ? '开始列' : ''}">${escapeHtml(
         column.name,
       )}${column.isDone ? '<i class="col-flag" title="完成列">✓</i>' : ''}</span>
       <span class="col-count">${tasks.length}</span>
       ${column.wipLimit ? `<span class="wip ${over ? 'over' : ''}" title="在制品上限">${tasks.length}/${column.wipLimit}</span>` : ''}
-      <button class="col-add" data-add="${column.id}" title="在此列新建任务" aria-label="在${escapeHtml(
-        column.name,
-      )}新建任务">${icon('plus', 14)}</button>
-      <button class="col-menu-btn" data-col-menu="${column.id}" title="列设置" aria-label="设置${escapeHtml(
-        column.name,
-      )}">${icon('more', 14)}</button>
+      <span class="col-actions">
+        <button class="col-add" data-add="${column.id}" title="在此列新建任务" aria-label="在${escapeHtml(
+          column.name,
+        )}新建任务">${icon('plus', 14)}</button>
+        <button class="col-menu-btn" data-col-menu="${column.id}" title="列设置" aria-label="设置${escapeHtml(
+          column.name,
+        )}">${icon('more', 14)}</button>
+      </span>
     </header>
     <div class="card-list" data-status="${column.id}">
       ${tasks.map(cardHtml).join('')}
@@ -307,6 +321,20 @@ function bind(root) {
     });
 
     root.addEventListener('dragstart', (event) => {
+      const head = event.target.closest('.col-head[data-col-id]');
+      if (head) {
+        // 列头里的按钮（新建/菜单）不参与拖拽，避免误触
+        if (event.target.closest('button')) {
+          event.preventDefault();
+          return;
+        }
+        columnDragId = head.dataset.colId;
+        head.closest('.column')?.classList.add('col-dragging');
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', `column:${columnDragId}`);
+        return;
+      }
+
       const card = event.target.closest('.card');
       if (!card) return;
       draggedId = card.dataset.taskId;
@@ -319,6 +347,7 @@ function bind(root) {
       const card = event.target.closest('.card');
       card?.classList.remove('dragging');
       root.querySelectorAll('.column').forEach((col) => col.classList.remove('drag-over'));
+      clearColumnDrag(root);
       draggedId = null;
       suppressClick = true;
       setTimeout(() => {
@@ -326,6 +355,55 @@ function bind(root) {
       }, 60);
     });
   }
+
+  // ---------- 列拖拽排序 ----------
+  root.addEventListener('dragover', (event) => {
+    if (!columnDragId) return;
+    const column = event.target.closest('.column');
+    const addTile = event.target.closest('.column-add-tile');
+    if (!column && !addTile) return;
+    event.preventDefault();
+
+    clearColumnDropMarks(root);
+    if (!column) {
+      root.querySelector('.board .column:last-of-type')?.classList.add('drop-after');
+      return;
+    }
+    if (column.dataset.status === columnDragId) return;
+    const rect = column.getBoundingClientRect();
+    column.classList.add(event.clientX > rect.left + rect.width / 2 ? 'drop-after' : 'drop-before');
+  });
+
+  root.addEventListener('drop', (event) => {
+    if (!columnDragId) return;
+    const column = event.target.closest('.column');
+    const addTile = event.target.closest('.column-add-tile');
+    if (!column && !addTile) return;
+    event.preventDefault();
+
+    const movingId = columnDragId;
+    const ids = columns().map((item) => item.id);
+    const from = ids.indexOf(movingId);
+    if (from === -1) {
+      clearColumnDrag(root);
+      return;
+    }
+    ids.splice(from, 1);
+
+    let insert = ids.length; // 落在「添加列」区域 → 排到最末
+    if (column) {
+      const targetIndex = ids.indexOf(column.dataset.status);
+      if (targetIndex === -1) {
+        clearColumnDrag(root);
+        return;
+      }
+      insert = column.classList.contains('drop-after') ? targetIndex + 1 : targetIndex;
+    }
+
+    clearColumnDrag(root);
+    if (insert === from) return; // 位置没变，不做请求
+    moveColumn(movingId, insert).catch((error) => toast(error.message, 'error'));
+  });
 
   root.querySelectorAll('.card-list').forEach((list) => {
     list.addEventListener('dragover', (event) => {

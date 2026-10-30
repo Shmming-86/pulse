@@ -125,6 +125,8 @@ const ICONS = {
 /** 24 栅格图标（Lucide 几何）：必须用 viewBox 24 + stroke 2，否则会被裁切 */
 const ICONS_24 = {
   alert: '<circle cx="12" cy="12" r="9.5"/><path d="M12 7.6v5.1M12 16.2h.01"/>',
+  grip:
+    '<circle cx="9" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.4" fill="currentColor" stroke="none"/>',
   trend: '<path d="M22 7l-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>',
   squareCheck: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8.4 12.4l2.6 2.6 4.6-5.2"/>',
 };

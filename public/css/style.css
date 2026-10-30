@@ -3694,3 +3694,152 @@ select {
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
+
+/* ============================================================
+   v1.12：卡片放大 + 列拖拽排序
+   ============================================================ */
+
+/* 列更宽，卡片有更多呼吸空间 */
+.column {
+  flex: 0 0 320px;
+  width: 320px;
+  position: relative;
+}
+
+.card-list {
+  padding: 2px 9px 9px;
+  gap: 9px;
+}
+
+/* 卡片整体放大一档，标题与 meta 都更好读 */
+.card {
+  padding: 12px 13px 11px;
+  border-radius: 11px;
+}
+
+.card-head {
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.card-type-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+}
+
+.card-type-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.card-key {
+  font-size: 10.5px;
+}
+
+.card-avatar .avatar,
+.avatar.avatar-card,
+.avatar-ghost {
+  width: 30px;
+  height: 30px;
+  font-size: 11.5px;
+}
+
+.card-title {
+  font-size: 13.6px;
+  line-height: 1.55;
+  -webkit-line-clamp: 3;
+}
+
+.card-labels {
+  margin-top: 8px;
+}
+
+.chip-label {
+  height: 18px;
+  padding: 0 6px;
+  font-size: 10.5px;
+  line-height: 18px;
+}
+
+.card-foot {
+  margin-top: 9px;
+  gap: 10px;
+  font-size: 11.5px;
+}
+
+.card-foot .prio i {
+  width: 6.5px;
+  height: 6.5px;
+}
+
+.card-foot .sub-progress {
+  font-size: 11px;
+}
+
+.diff-meter i { height: 7px; }
+.diff-meter i:nth-child(2) { height: 9px; }
+.diff-meter i:nth-child(3) { height: 11px; }
+.diff-meter i:nth-child(4) { height: 13px; }
+
+/* 列头拖拽 */
+.col-head[draggable='true'] {
+  cursor: grab;
+}
+
+.col-head[draggable='true']:active {
+  cursor: grabbing;
+}
+
+.col-grip {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 18px;
+  margin-right: -2px;
+  color: #c3c8d6;
+  flex: 0 0 auto;
+  transition: color 0.14s ease;
+}
+
+.col-head:hover .col-grip {
+  color: var(--text-3);
+}
+
+.column.col-dragging {
+  opacity: 0.5;
+}
+
+/* 落点指示线 */
+.column.drop-before::before,
+.column.drop-after::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  z-index: 4;
+}
+
+.column.drop-before::before { left: -7px; }
+.column.drop-after::after { right: -7px; }
+
+/* 列头操作按钮成组靠右，避免与列名/计数分散 */
+.col-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+/* 列菜单改为常显（低不透明度），既被发现又不抢注意力 */
+.col-menu-btn {
+  opacity: 0.45;
+}
+
+.col-head:hover .col-menu-btn {
+  opacity: 1;
+}
