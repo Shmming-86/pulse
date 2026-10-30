@@ -17,6 +17,17 @@ function startOfWeek(ms) {
   return day - weekday * DAY;
 }
 
+/**
+ * 本地时区的 YYYY-MM-DD。
+ * 不能用 toISOString().slice(0,10)：东八区的周一 00:00 会被序列化成周日的 UTC 日期，
+ * 前端按本地日期解析就会整体错开一天（周度热力/明细对不上）。
+ */
+function isoDayLocal(ms) {
+  const d = new Date(ms);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 function labelOf(ms) {
   const d = new Date(ms);
   return `${d.getMonth() + 1}/${d.getDate()}`;
@@ -303,7 +314,7 @@ export function createAnalyticsService({ tasks, members, columns }) {
 
       const memberWeekly = {
         weeks: weeks.map((week) => ({
-          start: new Date(week.start).toISOString().slice(0, 10),
+          start: isoDayLocal(week.start),
           label: week.label,
         })),
         members: memberWeeklyRows,

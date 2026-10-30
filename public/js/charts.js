@@ -218,3 +218,61 @@ export function emptyChart(height = 200) {
     <p>暂无可分析的数据</p>
   </div>`;
 }
+
+/**
+ * 迷你趋势线：KPI 卡右下角用，不画坐标轴，只表达走向。
+ * values 为按时间正序的数值数组。
+ */
+export function sparkline(values, { width = 108, height = 30, color = '#5b5bd6' } = {}) {
+  const data = (values ?? []).map((v) => Number(v) || 0);
+  if (data.length < 2) return '';
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const span = max - min || 1;
+  const stepX = width / (data.length - 1);
+  const y = (v) => height - 3 - ((v - min) / span) * (height - 8);
+
+  const points = data.map((v, i) => [i * stepX, y(v)]);
+  const line = points.map(([x, py], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${py.toFixed(1)}`).join(' ');
+  const area = `${line} L${width} ${height} L0 ${height} Z`;
+  const last = points[points.length - 1];
+  const id = `sp${Math.random().toString(36).slice(2, 8)}`;
+
+  return `<svg class="spark" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${color}" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+    </linearGradient></defs>
+    <path d="${area}" fill="url(#${id})"/>
+    <path d="${line}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.4" fill="${color}"/>
+  </svg>`;
+}
+
+/** 环形进度（完成率等百分比指标），中心留白由外层文字填充 */
+export function ringProgress(percent, { size = 46, thickness = 5, color = '#5b5bd6', track = '#e9ecf3' } = {}) {
+  const pct = Math.max(0, Math.min(100, Number(percent) || 0));
+  const r = (size - thickness) / 2;
+  const c = 2 * Math.PI * r;
+  const dash = (pct / 100) * c;
+  return `<svg class="ring" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" aria-hidden="true">
+    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${track}" stroke-width="${thickness}"/>
+    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="${thickness}"
+      stroke-linecap="round" stroke-dasharray="${dash.toFixed(2)} ${(c - dash).toFixed(2)}"
+      transform="rotate(-90 ${size / 2} ${size / 2})"/>
+  </svg>`;
+}
+
+/** 水平分段条：用于负载/容量对比，segments = [{value, color}] */
+export function segmentBar(segments, { height = 8, total = null } = {}) {
+  const sum = total ?? segments.reduce((acc, s) => acc + (s.value || 0), 0);
+  if (!sum) return `<div class="segbar" style="height:${height}px;background:var(--surface-2);border-radius:999px"></div>`;
+  const parts = segments
+    .filter((s) => s.value > 0)
+    .map(
+      (s) =>
+        `<span style="width:${((s.value / sum) * 100).toFixed(2)}%;background:${s.color}"></span>`,
+    )
+    .join('');
+  return `<div class="segbar" style="height:${height}px">${parts}</div>`;
+}
