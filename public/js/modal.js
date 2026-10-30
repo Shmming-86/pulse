@@ -142,8 +142,18 @@ export function openTaskModal({ defaultStatus = null, onCreated } = {}) {
           <input type="date" name="dueDate" />
         </label>
         <label class="field">
-          <span>预估点数</span>
-          <input type="number" name="estimate" min="0" max="100" step="1" placeholder="可选" />
+          <span>难易程度</span>
+          <select name="difficulty">
+            <option value="">未评估</option>
+            ${(state.meta.difficulties ?? [])
+              .map(
+                (item) =>
+                  `<option value="${item.id}" ${item.id === 'normal' ? 'selected' : ''}>${escapeHtml(
+                    item.name,
+                  )}</option>`,
+              )
+              .join('')}
+          </select>
         </label>
       </div>
       <div class="field">
@@ -274,7 +284,7 @@ export function openTaskModal({ defaultStatus = null, onCreated } = {}) {
               status: form.elements.status.value,
               assigneeId: form.elements.assigneeId.value || null,
               dueDate: form.elements.dueDate.value || null,
-              estimate: form.elements.estimate.value === '' ? null : Number(form.elements.estimate.value),
+              difficulty: form.elements.difficulty.value || null,
               labels: [...selectedLabels],
               description: form.elements.description.value,
             });

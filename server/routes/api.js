@@ -1,5 +1,5 @@
 import config from '../config.js';
-import { COLUMN_TONES, LABEL_POOL, MEMBER_COLORS, PRIORITIES, TYPES } from '../domain.js';
+import { COLUMN_TONES, DIFFICULTIES, LABEL_POOL, MEMBER_COLORS, PRIORITIES, TYPES } from '../domain.js';
 import { badRequest } from '../errors.js';
 
 export function registerApiRoutes(
@@ -31,6 +31,7 @@ export function registerApiRoutes(
       statuses: columnService.list(),
       columns: columnService.list(),
       priorities: PRIORITIES,
+      difficulties: DIFFICULTIES,
       types: TYPES,
       columnTones: COLUMN_TONES,
       memberColors: MEMBER_COLORS,

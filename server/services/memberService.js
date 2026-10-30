@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { MEMBER_COLORS } from '../domain.js';
+import { difficultyWeight, MEMBER_COLORS } from '../domain.js';
 import { badRequest, conflict, createValidator, notFound } from '../errors.js';
 
 const NAME_MAX = 16;
@@ -48,7 +48,7 @@ export function createMemberService({ members, tasks, columns, activity, transac
       open: open.length,
       inProgress: open.filter((task) => task.status === startColumnId).length,
       done: own.filter((task) => task.status === doneColumnId).length,
-      points: open.reduce((sum, task) => sum + (task.estimate ?? 0), 0),
+      points: open.reduce((sum, task) => sum + difficultyWeight(task.difficulty), 0),
       overdue: open.filter((task) => task.dueDate && task.dueDate < today).length,
     };
   }

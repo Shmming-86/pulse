@@ -3,6 +3,7 @@ import {
   isDoneStatus,
   memberById,
   priorityMeta,
+  difficultyMeta,
   state,
   statusMeta,
   updateTask,
@@ -21,7 +22,7 @@ const COLUMNS = [
   { key: 'assigneeId', label: '负责人', sortable: true, width: '110px' },
   { key: 'dueDate', label: '截止日期', sortable: true, width: '104px' },
   { key: 'startedAt', label: '开始时间', sortable: true, width: '104px' },
-  { key: 'estimate', label: '点数', sortable: true, width: '62px' },
+  { key: 'difficulty', label: '难度', sortable: true, width: '74px' },
   { key: 'updatedAt', label: '最近更新', sortable: true, width: '96px' },
 ];
 
@@ -49,8 +50,8 @@ function sorted(rows) {
         else if (!b.dueDate) result = -1;
         else result = a.dueDate.localeCompare(b.dueDate);
         break;
-      case 'estimate':
-        result = (a.estimate ?? 0) - (b.estimate ?? 0);
+      case 'difficulty':
+        result = difficultyMeta(a.difficulty).weight - difficultyMeta(b.difficulty).weight;
         break;
       case 'startedAt':
         if (!a.startedAt && !b.startedAt) result = 0;
@@ -124,7 +125,13 @@ function rowHtml(task) {
     <td style="color:var(--text-2);font-size:11.5px" title="${escapeHtml(
       task.startedAt ? `开始于 ${formatDateTime(task.startedAt)}` : '尚未开始',
     )}">${task.startedAt ? escapeHtml(formatDate(task.startedAt)) : '<span style="color:var(--text-3)">—</span>'}</td>
-    <td style="font-variant-numeric:tabular-nums;color:var(--text-2)">${task.estimate ?? '—'}</td>
+    <td style="color:var(--text-2)">${
+      task.difficulty
+        ? `<span class="diff-badge" style="color:${difficultyMeta(task.difficulty).color};background:${
+            difficultyMeta(task.difficulty).color
+          }18">${escapeHtml(difficultyMeta(task.difficulty).name)}</span>`
+        : '—'
+    }</td>
     <td style="color:var(--text-3);font-size:11.5px">${escapeHtml(relativeTime(task.updatedAt))}</td>
   </tr>`;
 }

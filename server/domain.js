@@ -47,6 +47,22 @@ export const TYPES = [
 
 export const TYPE_IDS = TYPES.map((t) => t.id);
 
+/**
+ * 任务难易程度：替代原先的自由数字「点数」。
+ * weight 是折算系数，用于在制工作量、成员负载与周度统计（越大越重）。
+ */
+export const DIFFICULTIES = [
+  { id: 'easy', name: '简单', weight: 1, color: '#12866f' },
+  { id: 'normal', name: '一般', weight: 2, color: '#3b82f6' },
+  { id: 'hard', name: '较难', weight: 3, color: '#d97706' },
+  { id: 'xhard', name: '困难', weight: 5, color: '#e5484d' },
+];
+
+export const DIFFICULTY_IDS = DIFFICULTIES.map((d) => d.id);
+
+/** 难度 → 折算权重（未评估记 0） */
+export const difficultyWeight = (id) => DIFFICULTIES.find((d) => d.id === id)?.weight ?? 0;
+
 export const LABEL_POOL = [
   '前端',
   '后端',

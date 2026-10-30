@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { PRIORITIES, PRIORITY_IDS, TYPE_IDS, TYPES } from '../domain.js';
+import { DIFFICULTIES, DIFFICULTY_IDS, PRIORITIES, PRIORITY_IDS, TYPE_IDS, TYPES } from '../domain.js';
 import { createValidator, notFound, badRequest } from '../errors.js';
 
 const MAX_SUBTASKS = 20;
 
 const priorityName = (id) => PRIORITIES.find((p) => p.id === id)?.name ?? id;
 const typeName = (id) => TYPES.find((t) => t.id === id)?.name ?? id;
+const difficultyName = (id) => DIFFICULTIES.find((d) => d.id === id)?.name ?? '未评估';
 
 /** ISO 时间转本地「YYYY-MM-DD HH:mm」，用于活动文案（服务端时区即团队时区） */
 function formatLocal(iso) {
@@ -81,8 +82,16 @@ export function createTaskService({ tasks, members, columns, activity, project, 
       // 看板列是动态的：以数据库中的列 ID 作为合法状态集合
       out.status = v.oneOf(input.status, 'status', statusIds, { optional: true }) ?? fallbackStatus;
     }
-    if (!partial || input.estimate !== undefined) {
-      out.estimate = v.integer(input.estimate, 'estimate', { min: 0, max: 100, optional: true });
+    if (!partial || input.difficulty !== undefined) {
+      const raw = input.difficulty;
+      if (raw === undefined || raw === null || raw === '') {
+        out.difficulty = null;
+      } else if (DIFFICULTY_IDS.includes(raw)) {
+        out.difficulty = raw;
+      } else {
+        v.issues.push({ field: 'difficulty', message: '难度取值无效（easy/normal/hard/xhard）' });
+        out.difficulty = null;
+      }
     }
     if (!partial || input.dueDate !== undefined) {
       out.dueDate = v.dateString(input.dueDate, 'dueDate', { optional: true });
@@ -140,7 +149,7 @@ export function createTaskService({ tasks, members, columns, activity, project, 
           assigneeId: data.assigneeId ?? null,
           reporterId: actorId,
           labels: data.labels ?? [],
-          estimate: data.estimate ?? null,
+          difficulty: data.difficulty ?? null,
           dueDate: data.dueDate ?? null,
           subtasks: [],
           order: tasks.countInColumn(data.status),
@@ -211,7 +220,7 @@ export function createTaskService({ tasks, members, columns, activity, project, 
         }
 
         const fields = {};
-        for (const field of ['title', 'description', 'type', 'priority', 'estimate', 'dueDate', 'assigneeId']) {
+        for (const field of ['title', 'description', 'type', 'priority', 'difficulty', 'dueDate', 'assigneeId']) {
           if (data[field] === undefined) continue;
           const before = task[field];
           const after = data[field];
@@ -221,6 +230,12 @@ export function createTaskService({ tasks, members, columns, activity, project, 
             changes.push({
               type: 'update',
               message: `${actorName(actorId)} 将优先级调整为「${priorityName(after)}」`,
+            });
+          } else if (field === 'difficulty') {
+            tasks.addHistory(id, { at: now, field: 'difficulty', from: before ?? null, to: after ?? null, actorId });
+            changes.push({
+              type: 'update',
+              message: `${actorName(actorId)} 将难度调整为「${difficultyName(after)}」`,
             });
           } else if (field === 'assigneeId') {
             tasks.addHistory(id, { at: now, field: 'assignee', from: before ?? null, to: after ?? null, actorId });
