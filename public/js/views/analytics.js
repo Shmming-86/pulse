@@ -1,171 +1,134 @@
-import { memberById, state } from '../state.js';
-import { avatarHtml, escapeHtml, icon } from '../utils.js';
-import { donutChart, groupedBarChart, lineChart, stackedAreaChart } from '../charts.js';
+import { difficultyMeta, isDoneStatus, memberById, state, statusMeta } from '../state.js';
+import { avatarHtml, escapeHtml } from '../utils.js';
+import {
+  donutChart,
+  emptyChart,
+  groupedBarChart,
+  ringProgress,
+  sparkline,
+  stackedAreaChart,
+} from '../charts.js';
 import { openTaskDrawer } from '../drawer.js';
+import { openDetailModal } from '../modal.js';
 
-/** 成员周度统计的指标切换（模块级，切换后重渲染面板即可） */
-const WEEKLY_METRICS = {
-  completed: { label: '完成任务', unit: '个' },
-  created: { label: '新建任务', unit: '个' },
-  started: { label: '开始任务', unit: '个' },
-  points: { label: '完成难度分', unit: '分' },
+/**
+ * 分析看板：卡片 + 图形优先，明细全部走「点击下钻」的弹框或任务抽屉。
+ * 所有明细由 state.tasks 在本地过滤，口径与服务端聚合保持一致（同源数据）。
+ */
+
+const DAY = 86_400_000;
+const COLUMN_PALETTE = ['#c3c8d4', '#5b5bd6', '#d97706', '#0d9488', '#8e4ec6', '#0891b2', '#e5484d', '#64748b'];
+
+const weekStartOf = (ts) => {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  const offset = (d.getDay() + 6) % 7; // 周一为一周起点
+  return d.getTime() - offset * DAY;
 };
-let weeklyMetric = 'completed';
 
-function weeklyTable(data, metric) {
-  const conf = WEEKLY_METRICS[metric];
-  const weeks = data.weeks ?? [];
-  const rows = data.members ?? [];
-  const max = Math.max(1, ...rows.flatMap((row) => row.weeks.map((cell) => cell[metric] ?? 0)));
+const fmtDate = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}月${d.getDate()}日`;
+};
 
-  const cellHtml = (value) => {
-    if (!value) return '<td class="wk-cell empty">·</td>';
-    const alpha = 0.12 + 0.72 * (value / max);
-    const color = alpha > 0.55 ? '#fff' : 'var(--text-1)';
-    return `<td class="wk-cell" style="background:rgba(91,91,214,${alpha.toFixed(2)});color:${color}">${value}</td>`;
-  };
+const openOf = () => state.tasks.filter((task) => !isDoneStatus(task.status));
+const doneOf = () => state.tasks.filter((task) => task.completedAt && isDoneStatus(task.status));
 
+const cycleDaysOf = (task) => {
+  if (!task.startedAt || !task.completedAt) return null;
+  const diff = new Date(task.completedAt).getTime() - new Date(task.startedAt).getTime();
+  return Math.max(0, Math.round((diff / DAY) * 10) / 10);
+};
+
+const memberNameOf = (task) => memberById(task.assigneeId)?.name ?? '未指派';
+
+const difficultyBadge = (task) => {
+  if (!task.difficulty) return '<span class="detail-muted">未评估</span>';
+  const d = difficultyMeta(task.difficulty);
+  return `<span class="diff-badge" style="color:${d.color};background:${d.color}18">${escapeHtml(d.name)}</span>`;
+};
+
+/* ---------------- 明细弹框：任务列表 ---------------- */
+
+function taskTable(rows, { showCycle = false, empty = '暂无任务' } = {}) {
+  if (!rows.length) return `<p class="detail-empty">${empty}</p>`;
   const body = rows
-    .map(
-      (row) => `<tr>
-        <td class="wk-name">
-          ${
-            row.id
-              ? avatarHtml(memberById(row.id) ?? { name: row.name, color: row.color, role: row.role }, 'avatar-sm')
-              : '<span class="avatar avatar-sm" style="background:#c3c8d4">?</span>'
-          }
-          <span>${escapeHtml(row.name)}</span>
-        </td>
-        ${row.weeks.map((cell) => cellHtml(cell[metric])).join('')}
-        <td class="wk-total">${row.totals[metric]}</td>
-        <td class="wk-cycle">${row.totals.cycleCount ? `${row.totals.cycle} 天` : '—'}</td>
-      </tr>`,
-    )
-    .join('');
-
-  const foot = `<tr class="wk-foot">
-      <td class="wk-name">合计</td>
-      ${(data.totals ?? []).map((total) => `<td class="wk-cell">${total[metric] ?? 0}</td>`).join('')}
-      <td class="wk-total">${rows.reduce((sum, row) => sum + (row.totals[metric] ?? 0), 0)}</td>
-      <td class="wk-cycle">—</td>
-    </tr>`;
-
-  if (!rows.length) {
-    return '<div class="weekly-empty">还没有成员数据</div>';
-  }
-
-  return `<div class="weekly-head">
-      <div class="metric-switch">
-        ${Object.entries(WEEKLY_METRICS)
-          .map(
-            ([key, item]) =>
-              `<button type="button" data-weekly-metric="${key}" class="${
-                key === metric ? 'on' : ''
-              }">${item.label}</button>`,
-          )
-          .join('')}
-      </div>
-      <span class="weekly-unit">单位：${conf.unit}</span>
-    </div>
-    <div class="weekly-scroll">
-      <table class="weekly-table">
-        <thead>
-          <tr>
-            <th class="wk-name">成员</th>
-            ${weeks.map((week) => `<th title="${escapeHtml(week.start)} 起的一周">${escapeHtml(week.label)}</th>`).join('')}
-            <th class="wk-total">8 周合计</th>
-            <th class="wk-cycle">平均周期</th>
-          </tr>
-        </thead>
-        <tbody>${body}</tbody>
-        <tfoot>${foot}</tfoot>
-      </table>
-    </div>`;
-}
-
-function kpiCard(label, value, unit, foot, tone = '') {
-  return `<div class="kpi">
-    <span class="kpi-label">${escapeHtml(label)}</span>
-    <span class="kpi-value ${tone}">${value}${unit ? `<small>${escapeHtml(unit)}</small>` : ''}</span>
-    <span class="kpi-foot">${foot}</span>
-  </div>`;
-}
-
-function trendFoot(current, previous, suffix = '个') {
-  const diff = current - previous;
-  if (diff === 0) return '与上周持平';
-  const cls = diff > 0 ? 'up' : 'down';
-  const sign = diff > 0 ? '+' : '';
-  return `较上周 <span class="${cls}">${sign}${diff} ${suffix}</span>`;
-}
-
-function insights(data) {
-  const { kpi, byMember, wipBreaches } = data;
-  const parts = [];
-  const diff = kpi.completedThisWeek - kpi.completedLastWeek;
-  parts.push(
-    `本周完成 <strong>${kpi.completedThisWeek}</strong> 个任务，${
-      diff === 0 ? '与上周持平' : diff > 0 ? `比上周多 <strong>${diff}</strong> 个` : `比上周少 <strong>${-diff}</strong> 个`
-    }。`,
-  );
-  if (kpi.overdue > 0) {
-    parts.push(
-      `有 <strong>${kpi.overdue}</strong> 个任务已逾期，占未完成任务的 ${Math.round(
-        (kpi.overdue / Math.max(1, kpi.open)) * 100,
-      )}%，建议优先清空。`,
-    );
-  }
-  const busiest = byMember.slice().sort((a, b) => b.points - a.points)[0];
-  if (busiest && busiest.points > 0) {
-    parts.push(`当前在制工作量最高的是 <strong>${escapeHtml(busiest.name)}</strong>（难度分 ${busiest.points} / ${busiest.open} 个任务）。`);
-  }
-  const breach = wipBreaches.find((item) => item.exceeded);
-  if (breach) parts.push(`「${escapeHtml(breach.name)}」已超过 WIP 上限（${breach.count}/${breach.limit}）。`);
-  return parts.join('');
-}
-
-function wipPanel(data) {
-  const breaches = data.wipBreaches
-    .map((item) => {
-      const ratio = Math.min(1, item.count / Math.max(1, item.limit));
-      return `<div class="bar-row">
-        <span class="bar-label">${escapeHtml(item.name)}</span>
-        <div class="bar-track"><i class="bar-fill" style="width:${Math.round(ratio * 100)}%;background:${
-          item.exceeded ? '#e5484d' : '#5b5bd6'
-        }"></i></div>
-        <span class="bar-value ${item.exceeded ? '' : ''}" style="${
-          item.exceeded ? 'color:#e5484d;font-weight:600' : ''
-        }">${item.count}/${item.limit}</span>
-      </div>`;
+    .map((task) => {
+      const cycle = cycleDaysOf(task);
+      return `<tr data-task-id="${task.id}">
+        <td class="detail-key">${escapeHtml(task.key)}</td>
+        <td class="detail-title">${escapeHtml(task.title)}</td>
+        <td>${escapeHtml(statusMeta(task.status).name)}</td>
+        <td>${escapeHtml(memberNameOf(task))}</td>
+        <td>${difficultyBadge(task)}</td>
+        <td>${showCycle ? (cycle === null ? '—' : `${cycle} 天`) : escapeHtml(fmtDate(task.dueDate))}</td>
+      </tr>`;
     })
     .join('');
-
-  const overdue = data.overdue.length
-    ? data.overdue
-        .map(
-          (task) => `<div class="mini-row" data-task-id="${task.id}">
-            <span class="mini-key">${escapeHtml(task.key)}</span>
-            <span class="mini-title">${escapeHtml(task.title)}</span>
-            <span class="mini-meta" style="color:#e5484d">逾期 ${task.daysLate} 天</span>
-          </div>`,
-        )
-        .join('')
-    : '<div style="padding:14px 2px;font-size:12px;color:var(--text-3)">没有逾期任务，节奏健康。</div>';
-
-  return `<div class="panel">
-    <div class="panel-head">
-      <div>
-        <div class="panel-title">在制品与风险</div>
-        <div class="panel-sub">WIP 上限用于限制并行，逾期任务需要优先处理</div>
-      </div>
-    </div>
-    ${breaches}
-    <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border)">
-      <div class="panel-sub" style="margin-bottom:4px;font-weight:600;color:var(--text-2)">逾期任务</div>
-      <div class="mini-list">${overdue}</div>
-    </div>
-  </div>`;
+  return `<table class="detail-table">
+    <thead><tr><th>编号</th><th>标题</th><th>状态</th><th>负责人</th><th>难度</th><th>${
+      showCycle ? '周期' : '截止'
+    }</th></tr></thead>
+    <tbody>${body}</tbody>
+  </table>`;
 }
+
+function openTaskList({ title, subtitle, rows, showCycle = false, empty }) {
+  openDetailModal({
+    title,
+    subtitle,
+    body: taskTable(rows, { showCycle, empty }),
+    onMount({ close, modal }) {
+      modal.querySelectorAll('tr[data-task-id]').forEach((row) => {
+        row.addEventListener('click', () => {
+          close({ skipDismiss: true });
+          openTaskDrawer(row.dataset.taskId);
+        });
+      });
+    },
+  });
+}
+
+function statStrip(items) {
+  return `<div class="detail-stats">${items
+    .map(
+      (item) =>
+        `<div class="detail-stat"><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(
+          String(item.value),
+        )}${item.unit ? `<em>${escapeHtml(item.unit)}</em>` : ''}</strong></div>`,
+    )
+    .join('')}</div>`;
+}
+
+/* ---------------- 卡片片段 ---------------- */
+
+function deltaFoot(current, previous, unit = '个') {
+  const diff = current - previous;
+  if (!diff) return '<span class="an-flat">与上周持平</span>';
+  const pct = previous ? Math.round((Math.abs(diff) / previous) * 100) : 100;
+  return diff > 0
+    ? `<span class="an-up">▲ ${diff}${unit}（+${pct}%）</span>`
+    : `<span class="an-down">▼ ${Math.abs(diff)}${unit}（-${pct}%）</span>`;
+}
+
+function kpiCard({ id, label, value, unit = '', foot = '', spark = '', ring = '', tone = '' }) {
+  return `<button type="button" class="an-kpi ${tone}" data-detail="${id}">
+    <span class="an-kpi-label">${label}</span>
+    <span class="an-kpi-value">${value}${unit ? `<em>${unit}</em>` : ''}</span>
+    <span class="an-kpi-foot">${foot}</span>
+    ${ring ? `<span class="an-kpi-ring">${ring}</span>` : ''}
+    ${spark ? `<span class="an-kpi-spark">${spark}</span>` : ''}
+  </button>`;
+}
+
+function weekHeader(weeks) {
+  return `<div class="an-heat-head"><span></span>${weeks
+    .map((week) => `<span>${escapeHtml(week.label)}</span>`)
+    .join('')}</div>`;
+}
+
+/* ---------------- 主渲染 ---------------- */
 
 export function renderAnalytics(root) {
   const data = state.analytics;
@@ -178,10 +141,11 @@ export function renderAnalytics(root) {
     return;
   }
 
-  const { kpi } = data;
-  // 颜色按列顺序分配，完成列固定绿色；堆叠图从下到上按列逆序展示
-  const COLUMN_PALETTE = ['#c3c8d4', '#5b5bd6', '#d97706', '#0d9488', '#8e4ec6', '#0891b2', '#e5484d', '#64748b'];
-  const series = (data.columns ?? state.meta.columns ?? [])
+  const kpi = data.kpi;
+  const throughput = data.throughput ?? [];
+  const cfd = data.cfd ?? [];
+  const weeks = data.memberWeekly?.weeks ?? [];
+  const columnSeries = (data.columns ?? [])
     .map((column, index) => ({
       key: column.id,
       name: column.name,
@@ -189,155 +153,647 @@ export function renderAnalytics(root) {
     }))
     .reverse();
 
-  const maxPoints = Math.max(1, ...data.byMember.map((member) => member.points));
-  const memberBars = data.byMember
-    .map((member) => {
-      const memberInfo = memberById(member.id);
-      const width = Math.round((member.points / maxPoints) * 100);
-      const share = member.open ? Math.round((member.inProgress / member.open) * 100) : 0;
-      return `<div class="bar-row" style="grid-template-columns:96px 1fr 76px">
-        <span class="bar-label">${avatarHtml(memberInfo, 'avatar-sm')}${escapeHtml(member.name)}</span>
-        <div class="bar-track" title="未完成任务 ${member.open} 个 / 难度分 ${member.points} / 进行中 ${member.inProgress} 个">
-          <div style="width:${width}%;height:100%;background:#c7c8f5;border-radius:4px;display:flex">
-            <div style="width:${share}%;height:100%;background:#5b5bd6;border-radius:4px"></div>
-          </div>
-        </div>
-        <span class="bar-value">${member.points} 点 / ${member.open} 个</span>
-      </div>`;
+  const now = Date.now();
+  const thisWeek = weekStartOf(now);
+  const lastWeek = thisWeek - 7 * DAY;
+  const doneThisWeek = doneOf().filter((task) => new Date(task.completedAt).getTime() >= thisWeek);
+  const doneLastWeek = doneOf().filter((task) => {
+    const ts = new Date(task.completedAt).getTime();
+    return ts >= lastWeek && ts < thisWeek;
+  });
+
+  const openRows = openOf();
+  const overdueRows = openRows
+    .filter((task) => task.dueDate && new Date(`${task.dueDate}T00:00:00`).getTime() < now)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const maxLate = overdueRows.length
+    ? Math.floor((now - new Date(`${overdueRows[0].dueDate}T00:00:00`).getTime()) / DAY)
+    : 0;
+
+  // ---- 成员负载 ----
+  const loadRows = (data.byMember ?? [])
+    .slice()
+    .sort((a, b) => b.points - a.points || b.open - a.open);
+  const maxLoadPoints = Math.max(1, ...loadRows.map((row) => row.points));
+  const loadHtml = loadRows
+    .map((row) => {
+      const info = memberById(row.id);
+      const memberTasks = openRows.filter((task) => task.assigneeId === row.id);
+      const doingPoints = memberTasks
+        .filter((task) => task.status === (data.columns ?? []).find((c) => c.isStart)?.id)
+        .reduce((sum, task) => sum + difficultyMeta(task.difficulty).weight, 0);
+      const width = Math.round((row.points / maxLoadPoints) * 100);
+      const doingShare = row.points ? Math.round((doingPoints / row.points) * 100) : 0;
+      return `<button type="button" class="an-load-row" data-member-load="${row.id}">
+        <span class="an-load-name">${avatarHtml(info, 'avatar-xs')}${escapeHtml(row.name)}</span>
+        <span class="an-load-bar">
+          <span class="an-load-fill" style="width:${width}%">
+            <span class="an-load-doing" style="width:${doingShare}%"></span>
+          </span>
+        </span>
+        <span class="an-load-value">${row.points} 分 · ${row.open} 个</span>
+      </button>`;
     })
     .join('');
 
-  const priorityLegend = data.byPriority
-    .map(
-      (item) => `<div class="legend-item"><span class="legend-swatch" style="background:${item.color}"></span>${escapeHtml(
-        item.name,
-      )} · ${item.count}</div>`,
-    )
-    .join('');
-
-  root.innerHTML = `<div class="analytics">
-    <div class="insight">${icon('sparkle', 16)}<div>${insights(data)}</div></div>
-
-    <div class="kpi-grid">
-      ${kpiCard('进行中', kpi.inProgress, '个', `未完成共 ${kpi.open} 个`)}
-      ${kpiCard('本周完成', kpi.completedThisWeek, '个', trendFoot(kpi.completedThisWeek, kpi.completedLastWeek))}
-      ${kpiCard('平均周期', kpi.avgCycle, '天', `中位数 ${kpi.medianCycle} 天 · 样本 ${data.cycleSample}`)}
-      ${kpiCard('完成率', kpi.completionRate, '%', `累计完成 ${kpi.total - kpi.open}/${kpi.total}`)}
-      ${kpiCard(
-        '逾期任务',
-        kpi.overdue,
-        '个',
-        kpi.overdue ? `<span class="down">需要优先处理</span>` : '当前无逾期',
-      )}
-      ${kpiCard('在制工作量', kpi.wipPoints, '分', `平均交付周期 ${kpi.avgLead} 天`)}
-    </div>
-
-    <div class="chart-grid">
-      <div class="panel">
-        <div class="panel-head">
-          <div>
-            <div class="panel-title">累计流图（CFD）</div>
-            <div class="panel-sub">按周统计各状态存量，识别积压与流转瓶颈</div>
-          </div>
-          <div class="legend">${series
-            .slice()
-            .reverse()
-            .map(
-              (item) =>
-                `<span class="legend-item"><span class="legend-swatch" style="background:${item.color}"></span>${item.name}</span>`,
-            )
-            .join('')}</div>
-        </div>
-        ${stackedAreaChart(data.cfd, series)}
-      </div>
-      <div class="panel">
-        <div class="panel-head">
-          <div>
-            <div class="panel-title">优先级分布</div>
-            <div class="panel-sub">全部 ${kpi.total} 个任务</div>
-          </div>
-        </div>
-        ${donutChart(data.byPriority, { size: 158, centerLabel: '任务' })}
-        <div class="legend" style="margin-top:12px;flex-direction:column;gap:6px">${priorityLegend}</div>
-      </div>
-    </div>
-
-    <div class="chart-grid">
-      <div class="panel">
-        <div class="panel-head">
-          <div>
-            <div class="panel-title">吞吐量</div>
-            <div class="panel-sub">每周新建与完成任务数，观察需求进入与交付节奏</div>
-          </div>
-          <div class="legend">
-            <span class="legend-item"><span class="legend-swatch" style="background:#c3c8d4"></span>新建</span>
-            <span class="legend-item"><span class="legend-swatch" style="background:#5b5bd6"></span>完成</span>
-          </div>
-        </div>
-        ${groupedBarChart(
-          data.throughput,
-          [
-            { key: 'created', name: '新建', color: '#c3c8d4' },
-            { key: 'completed', name: '完成', color: '#5b5bd6' },
-          ],
-          { height: 220 },
-        )}
-      </div>
-      <div class="panel">
-        <div class="panel-head">
-          <div>
-            <div class="panel-title">成员负载</div>
-            <div class="panel-sub">深色为进行中占比，按剩余难度分排序</div>
-          </div>
-        </div>
-        ${memberBars}
-        <div class="legend" style="margin-top:10px">
-          <span class="legend-item"><span class="legend-swatch" style="background:#5b5bd6"></span>进行中</span>
-          <span class="legend-item"><span class="legend-swatch" style="background:#c7c8f5"></span>其他未完成</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="chart-grid">
-      <div class="panel">
-        <div class="panel-head">
-          <div>
-            <div class="panel-title">周期时间趋势</div>
-            <div class="panel-sub">从开始动手到完成所需的平均天数</div>
-          </div>
-        </div>
-        ${lineChart(
-          data.throughput.map((week) => ({ label: week.label, value: week.cycle })),
-          { height: 208 },
-        )}
-      </div>
-      ${wipPanel(data)}
-    </div>
-
-    <div class="panel weekly-panel">
-      <div class="panel-head">
-        <div>
-          <div class="panel-title">成员周度统计</div>
-          <div class="panel-sub">按任务当前负责人归属 · 每周一为起点 · 最近 8 周（开始时间取自任务首次进入「开始列」）</div>
-        </div>
-      </div>
-      <div id="weekly-body">${
-        data.memberWeekly ? weeklyTable(data.memberWeekly, weeklyMetric) : '<div class="weekly-empty">暂无数据</div>'
-      }</div>
-    </div>
+  // ---- 周度热力 ----
+  const weeklyMembers = data.memberWeekly?.members ?? [];
+  const maxCell = Math.max(1, ...weeklyMembers.flatMap((row) => row.weeks.map((cell) => cell.completed)));
+  const heatHtml = `<div class="an-heat">
+    ${weekHeader(weeks)}
+    ${weeklyMembers
+      .map(
+        (row) => `<div class="an-heat-row">
+          <span class="an-heat-name" title="${escapeHtml(row.name)}">${escapeHtml(row.name.slice(0, 2))}</span>
+          ${row.weeks
+            .map((cell, index) => {
+              const alpha = cell.completed ? 0.14 + 0.7 * (cell.completed / maxCell) : 0;
+              const color = alpha > 0.55 ? '#fff' : cell.completed ? 'var(--text-1)' : 'var(--text-3)';
+              return `<button type="button" class="an-heat-cell" data-heat="${row.id ?? 'none'}|${index}" style="background:rgba(91,91,214,${alpha.toFixed(
+                2,
+              )});color:${color}" title="${escapeHtml(row.name)} · ${escapeHtml(weeks[index]?.label ?? '')}：完成 ${
+                cell.completed
+              } 个">${cell.completed || ''}</button>`;
+            })
+            .join('')}
+        </div>`,
+      )
+      .join('')}
   </div>`;
 
-  const weeklyBody = root.querySelector('#weekly-body');
-  if (weeklyBody && data.memberWeekly) {
-    weeklyBody.addEventListener('click', (event) => {
-      const button = event.target.closest('[data-weekly-metric]');
-      if (!button) return;
-      weeklyMetric = button.dataset.weeklyMetric;
-      weeklyBody.innerHTML = weeklyTable(data.memberWeekly, weeklyMetric);
-    });
-  }
+  // ---- 风险 ----
+  const breaches = (data.wipBreaches ?? []).filter((row) => row.limit);
+  const exceededCols = breaches.filter((row) => row.exceeded);
+  const atLimitCols = breaches.filter((row) => !row.exceeded && row.count === row.limit);
+  const riskHtml = `
+    ${
+      overdueRows.length
+        ? overdueRows
+            .slice(0, 3)
+            .map((task) => {
+              const days = Math.floor((now - new Date(`${task.dueDate}T00:00:00`).getTime()) / DAY);
+              return `<button type="button" class="an-risk-item" data-risk-task="${task.id}">
+                <span class="an-risk-key">${escapeHtml(task.key)}</span>
+                <span class="an-risk-title">${escapeHtml(task.title)}</span>
+                <span class="an-risk-badge">逾期 ${days} 天</span>
+              </button>`;
+            })
+            .join('')
+        : '<p class="an-risk-empty">当前没有逾期任务</p>'
+    }
+    ${
+      exceededCols.length || atLimitCols.length
+        ? `<div class="an-risk-wip">
+            ${exceededCols
+              .map(
+                (row) =>
+                  `<span class="an-wip-chip danger">${escapeHtml(row.name)} 超限 ${row.count}/${
+                    row.limit
+                  }</span>`,
+              )
+              .join('')}
+            ${atLimitCols
+              .map(
+                (row) =>
+                  `<span class="an-wip-chip">${escapeHtml(row.name)} 已达上限 ${row.count}/${
+                    row.limit
+                  }</span>`,
+              )
+              .join('')}
+          </div>`
+        : ''
+    }`;
 
-  root.querySelectorAll('.mini-row[data-task-id]').forEach((row) => {
-    row.addEventListener('click', () => openTaskDrawer(row.dataset.taskId));
+  root.innerHTML = `<div class="an-page">
+    <header class="an-top">
+      <div>
+        <div class="an-title">效能概览</div>
+        <div class="an-sub">近 ${weeks.length || 8} 周 · 更新于 ${fmtDate(
+          data.generatedAt,
+        )} · 点击卡片或图元查看明细</div>
+      </div>
+      <div class="an-legend">
+        ${(data.byType ?? [])
+          .map(
+            (item) =>
+              `<span class="an-legend-item"><i style="background:${item.color}"></i>${escapeHtml(
+                item.name,
+              )} ${item.count}</span>`,
+          )
+          .join('')}
+      </div>
+    </header>
+
+    <section class="an-kpis">
+      ${kpiCard({
+        id: 'completed',
+        label: '本周完成',
+        value: kpi.completedThisWeek,
+        unit: '个',
+        foot: deltaFoot(kpi.completedThisWeek, kpi.completedLastWeek),
+        spark: sparkline(throughput.map((row) => row.completed ?? 0), { color: '#5b5bd6' }),
+      })}
+      ${kpiCard({
+        id: 'wip',
+        label: '进行中',
+        value: kpi.inProgress,
+        unit: '个',
+        foot: `未完成共 ${kpi.open} 个`,
+      })}
+      ${kpiCard({
+        id: 'cycle',
+        label: '平均周期',
+        value: kpi.avgCycle,
+        unit: '天',
+        foot: `中位数 ${kpi.medianCycle} 天 · 样本 ${data.cycleSample}`,
+        spark: sparkline(
+          throughput.map((row) => row.avgCycle ?? 0).filter((value) => value > 0),
+          { color: '#0d9488' },
+        ),
+      })}
+      ${kpiCard({
+        id: 'completion',
+        label: '完成率',
+        value: kpi.completionRate,
+        unit: '%',
+        foot: `累计 ${kpi.total - kpi.open}/${kpi.total}`,
+        ring: ringProgress(kpi.completionRate, { size: 44, thickness: 5 }),
+      })}
+      ${kpiCard({
+        id: 'overdue',
+        label: '逾期任务',
+        value: kpi.overdue,
+        unit: '个',
+        tone: kpi.overdue ? 'danger' : '',
+        foot: kpi.overdue ? `最长逾期 ${maxLate} 天` : '当前无逾期',
+      })}
+      ${kpiCard({
+        id: 'points',
+        label: '在制难度分',
+        value: kpi.wipPoints,
+        unit: '分',
+        foot: `平均交付 ${kpi.avgLead} 天`,
+      })}
+    </section>
+
+    <section class="an-grid">
+      <article class="an-card" data-detail="throughput">
+        <div class="an-card-head">
+          <div>
+            <div class="an-card-title">交付节奏</div>
+            <div class="an-card-sub">每周新建与完成对比，点击查看周明细</div>
+          </div>
+          <span class="an-link">明细</span>
+        </div>
+        ${throughput.length ? groupedBarChart(
+          throughput,
+          [
+            { key: 'created', name: '新建', color: '#9aa3f0' },
+            { key: 'completed', name: '完成', color: '#5b5bd6' },
+          ],
+          { height: 210 },
+        ) : emptyChart(210)}
+      </article>
+
+      <article class="an-card" data-detail="cfd">
+        <div class="an-card-head">
+          <div>
+            <div class="an-card-title">累计流（CFD）</div>
+            <div class="an-card-sub">各列存量随时间变化，识别积压</div>
+          </div>
+          <span class="an-link">明细</span>
+        </div>
+        ${cfd.length ? stackedAreaChart(cfd, columnSeries, { height: 210 }) : emptyChart(210)}
+      </article>
+
+      <article class="an-card" data-detail="load">
+        <div class="an-card-head">
+          <div>
+            <div class="an-card-title">成员负载</div>
+            <div class="an-card-sub">按未完成难度分排序 · 深色为进行中</div>
+          </div>
+          <span class="an-link">明细</span>
+        </div>
+        <div class="an-load">${loadHtml || '<p class="an-risk-empty">暂无成员</p>'}</div>
+      </article>
+
+      <article class="an-card" data-detail="heat">
+        <div class="an-card-head">
+          <div>
+            <div class="an-card-title">周度节奏</div>
+            <div class="an-card-sub">每人每周完成任务数，点格子看当周明细</div>
+          </div>
+          <span class="an-link">明细</span>
+        </div>
+        ${heatHtml}
+      </article>
+
+      <article class="an-card" data-detail="mix">
+        <div class="an-card-head">
+          <div>
+            <div class="an-card-title">任务构成</div>
+            <div class="an-card-sub">按类型分布</div>
+          </div>
+          <span class="an-link">明细</span>
+        </div>
+        <div class="an-mix">
+          ${donutChart(data.byType ?? [], { size: 148, thickness: 16, centerLabel: '任务' })}
+        </div>
+      </article>
+
+      <article class="an-card" data-detail="risk">
+        <div class="an-card-head">
+          <div>
+            <div class="an-card-title">风险预警</div>
+            <div class="an-card-sub">逾期与 WIP 超限，点击任务直达详情</div>
+          </div>
+          <span class="an-link">明细</span>
+        </div>
+        ${riskHtml}
+      </article>
+    </section>
+  </div>`;
+
+  const page = root.querySelector('.an-page');
+  if (page)
+    bindInteractions(page, {
+      data,
+      weeks,
+      doneThisWeek,
+      doneLastWeek,
+      overdueRows,
+      openRows,
+      exceededCols,
+      atLimitCols,
+    });
+}
+
+/* ---------------- 交互 ---------------- */
+
+function bindInteractions(root, ctx) {
+  const { data, weeks, doneThisWeek, doneLastWeek, overdueRows, openRows, exceededCols, atLimitCols } = ctx;
+
+  root.addEventListener('click', (event) => {
+    const riskTask = event.target.closest('[data-risk-task]');
+    if (riskTask) {
+      event.stopPropagation();
+      openTaskDrawer(riskTask.dataset.riskTask);
+      return;
+    }
+
+    const heatCell = event.target.closest('[data-heat]');
+    if (heatCell) {
+      event.stopPropagation();
+      const [memberId, index] = heatCell.dataset.heat.split('|');
+      openHeatDetail(data, memberId === 'none' ? null : memberId, Number(index));
+      return;
+    }
+
+    const memberRow = event.target.closest('[data-member-load]');
+    if (memberRow) {
+      event.stopPropagation();
+      const memberId = memberRow.dataset.memberLoad;
+      const tasks = openRows.filter((task) => task.assigneeId === memberId);
+      openTaskList({
+        title: `${memberById(memberId)?.name ?? '成员'} · 未完成任务`,
+        subtitle: `共 ${tasks.length} 个，按难度分加权排序`,
+        rows: tasks.sort(
+          (a, b) => difficultyMeta(b.difficulty).weight - difficultyMeta(a.difficulty).weight,
+        ),
+      });
+      return;
+    }
+
+    const card = event.target.closest('[data-detail]');
+    if (!card) return;
+    const kind = card.dataset.detail;
+    const handlers = {
+      completed: () =>
+        openDetailModal({
+          title: '本周交付明细',
+          subtitle: '本周与上周完成的任务，点击行可打开任务详情',
+          body: `${statStrip([
+            { label: '本周完成', value: doneThisWeek.length, unit: '个' },
+            { label: '上周完成', value: doneLastWeek.length, unit: '个' },
+          ])}${taskTable(doneThisWeek, { showCycle: true, empty: '本周还没有完成的任务' })}`,
+          onMount({ close, modal }) {
+            modal.querySelectorAll('tr[data-task-id]').forEach((row) => {
+              row.addEventListener('click', () => {
+                close({ skipDismiss: true });
+                openTaskDrawer(row.dataset.taskId);
+              });
+            });
+          },
+        }),
+      wip: () => {
+        const group = (data.columns ?? []).map((column) => ({
+          column,
+          tasks: openRows.filter((task) => task.status === column.id),
+        }));
+        openDetailModal({
+          title: '进行中与在办分布',
+          subtitle: '按看板列统计未完成任务，WIP 超限会在风险卡片提示',
+          body: `<div class="detail-cols">${group
+            .map(
+              (item) => `<div class="detail-col">
+                <div class="detail-col-head"><span>${escapeHtml(item.column.name)}</span><b>${
+                  item.tasks.length
+                }</b></div>
+                <div class="detail-col-body">${
+                  item.tasks.length
+                    ? item.tasks
+                        .slice(0, 6)
+                        .map(
+                          (task) =>
+                            `<button type="button" class="detail-mini" data-open-task="${task.id}">
+                              <span class="detail-key">${escapeHtml(task.key)}</span>
+                              <span>${escapeHtml(task.title)}</span>
+                            </button>`,
+                        )
+                        .join('')
+                    : '<p class="detail-muted">空</p>'
+                }</div>
+              </div>`,
+            )
+            .join('')}</div>`,
+          onMount({ close, modal }) {
+            modal.querySelectorAll('[data-open-task]').forEach((btn) => {
+              btn.addEventListener('click', () => {
+                close({ skipDismiss: true });
+                openTaskDrawer(btn.dataset.openTask);
+              });
+            });
+          },
+        });
+      },
+      cycle: () => {
+        const buckets = [
+          { label: '≤1 天', min: 0, max: 1 },
+          { label: '1~3 天', min: 1, max: 3 },
+          { label: '3~7 天', min: 3, max: 7 },
+          { label: '7~14 天', min: 7, max: 14 },
+          { label: '>14 天', min: 14, max: Infinity },
+        ].map((bucket) => {
+          const rows = doneOf().filter((task) => {
+            const days = cycleDaysOf(task);
+            return days !== null && days >= bucket.min && days < bucket.max;
+          });
+          return { ...bucket, count: rows.length, rows };
+        });
+        const maxCount = Math.max(1, ...buckets.map((bucket) => bucket.count));
+        openDetailModal({
+          title: '交付周期分布',
+          subtitle: `平均 ${data.kpi.avgCycle} 天 · 中位数 ${data.kpi.medianCycle} 天 · 样本 ${data.cycleSample} 个`,
+          body: `<div class="detail-bars">${buckets
+            .map(
+              (bucket) => `<div class="detail-bar-row">
+                <span class="detail-bar-label">${bucket.label}</span>
+                <span class="detail-bar-track"><span style="width:${Math.round(
+                  (bucket.count / maxCount) * 100,
+                )}%"></span></span>
+                <span class="detail-bar-value">${bucket.count}</span>
+              </div>`,
+            )
+            .join('')}</div>
+            ${taskTable(
+              doneOf()
+                .slice()
+                .sort((a, b) => (cycleDaysOf(b) ?? 0) - (cycleDaysOf(a) ?? 0))
+                .slice(0, 20),
+              { showCycle: true },
+            )}`,
+          onMount({ close, modal }) {
+            modal.querySelectorAll('tr[data-task-id]').forEach((row) => {
+              row.addEventListener('click', () => {
+                close({ skipDismiss: true });
+                openTaskDrawer(row.dataset.taskId);
+              });
+            });
+          },
+        });
+      },
+      completion: () => {
+        const types = (data.byType ?? []).map((type) => {
+          const all = state.tasks.filter((task) => task.type === type.id);
+          const done = all.filter((task) => isDoneStatus(task.status));
+          return {
+            ...type,
+            total: all.length,
+            done: done.length,
+            rate: all.length ? Math.round((done.length / all.length) * 100) : 0,
+          };
+        });
+        openDetailModal({
+          title: '完成率构成',
+          subtitle: '按任务类型拆分完成情况',
+          body: `${statStrip([
+            { label: '整体完成率', value: `${data.kpi.completionRate}`, unit: '%' },
+            { label: '已完成', value: data.kpi.total - data.kpi.open, unit: '个' },
+            { label: '未完成', value: data.kpi.open, unit: '个' },
+          ])}
+          <table class="detail-table"><thead><tr><th>类型</th><th>总数</th><th>已完成</th><th>完成率</th></tr></thead>
+          <tbody>${types
+            .map(
+              (type) => `<tr><td>${escapeHtml(type.name)}</td><td>${type.total}</td><td>${
+                type.done
+              }</td><td>${type.rate}%</td></tr>`,
+            )
+            .join('')}</tbody></table>`,
+        });
+      },
+      overdue: () =>
+        openTaskList({
+          title: '逾期任务',
+          subtitle: `共 ${overdueRows.length} 个，按截止日期排序；点击行打开任务`,
+          rows: overdueRows,
+          empty: '当前没有逾期任务',
+        }),
+      points: () => {
+        const byDifficulty = (state.meta.difficulties ?? []).map((item) => {
+          const rows = openRows.filter((task) => task.difficulty === item.id);
+          return { ...item, rows, count: rows.length };
+        });
+        const unrated = openRows.filter((task) => !task.difficulty);
+        openDetailModal({
+          title: '在制难度构成',
+          subtitle: `未完成任务合计 ${data.kpi.wipPoints} 分（未评估任务不计分）`,
+          body: `<table class="detail-table"><thead><tr><th>难度</th><th>权重</th><th>任务数</th><th>小计</th></tr></thead>
+          <tbody>${byDifficulty
+            .map(
+              (item) => `<tr><td>${difficultyBadge({ difficulty: item.id })}</td><td>${
+                item.weight
+              }</td><td>${item.count}</td><td>${item.count * item.weight}</td></tr>`,
+            )
+            .join('')}
+          <tr><td><span class="detail-muted">未评估</span></td><td>0</td><td>${
+            unrated.length
+          }</td><td>0</td></tr></tbody></table>`,
+        });
+      },
+      throughput: () => {
+        const rows = data.throughput ?? [];
+        const avgCreate = rows.length
+          ? Math.round(rows.reduce((sum, row) => sum + (row.created ?? 0), 0) / rows.length)
+          : 0;
+        const avgDone = rows.length
+          ? Math.round(rows.reduce((sum, row) => sum + (row.completed ?? 0), 0) / rows.length)
+          : 0;
+        openDetailModal({
+          title: '交付节奏明细',
+          subtitle: '每周新建 / 完成 / 平均周期',
+          body: `${statStrip([
+            { label: '周均新建', value: avgCreate, unit: '个' },
+            { label: '周均完成', value: avgDone, unit: '个' },
+            { label: '完成率', value: kpiRate(rows), unit: '%' },
+          ])}
+          <table class="detail-table"><thead><tr><th>周</th><th>新建</th><th>完成</th><th>平均周期</th></tr></thead>
+          <tbody>${rows
+            .map(
+              (row) => `<tr><td>${escapeHtml(row.label ?? '')}</td><td>${row.created ?? 0}</td><td>${
+                row.completed ?? 0
+              }</td><td>${row.avgCycle ? `${row.avgCycle} 天` : '—'}</td></tr>`,
+            )
+            .join('')}</tbody></table>`,
+        });
+      },
+      cfd: () => {
+        const series = (data.columns ?? []).slice();
+        openDetailModal({
+          title: '累计流明细',
+          subtitle: '每周各列存量（任务数）',
+          body: `<table class="detail-table"><thead><tr><th>周</th>${series
+            .map((column) => `<th>${escapeHtml(column.name)}</th>`)
+            .join('')}</tr></thead>
+          <tbody>${(data.cfd ?? [])
+            .map(
+              (row) => `<tr><td>${escapeHtml(row.label ?? '')}</td>${series
+                .map((column) => `<td>${row[column.id] ?? 0}</td>`)
+                .join('')}</tr>`,
+            )
+            .join('')}</tbody></table>`,
+        });
+      },
+      load: () => {
+        const rows = (data.byMember ?? []).slice().sort((a, b) => b.points - a.points);
+        openDetailModal({
+          title: '成员负载明细',
+          subtitle: '未完成任务数、进行中、难度分、近 30 天完成',
+          body: `<table class="detail-table"><thead><tr><th>成员</th><th>未完成</th><th>进行中</th><th>难度分</th><th>近 30 天完成</th><th>紧急</th></tr></thead>
+          <tbody>${rows
+            .map(
+              (row) => `<tr><td>${escapeHtml(row.name)}</td><td>${row.open}</td><td>${
+                row.inProgress
+              }</td><td>${row.points}</td><td>${row.done30d}</td><td>${row.urgent}</td></tr>`,
+            )
+            .join('')}</tbody></table>`,
+        });
+      },
+      heat: () => {
+        const members = data.memberWeekly?.members ?? [];
+        openDetailModal({
+          title: '周度节奏明细',
+          subtitle: '每人每周完成任务数 / 难度分',
+          body: `<table class="detail-table"><thead><tr><th>成员</th>${weeks
+            .map((week) => `<th>${escapeHtml(week.label)}</th>`)
+            .join('')}<th>合计</th></tr></thead>
+          <tbody>${members
+            .map(
+              (row) => `<tr><td>${escapeHtml(row.name)}</td>${row.weeks
+                .map((cell) => `<td>${cell.completed || '·'}</td>`)
+                .join('')}<td>${row.totals.completed}</td></tr>`,
+            )
+            .join('')}</tbody></table>`,
+        });
+      },
+      mix: () => {
+        const types = data.byType ?? [];
+        const priorities = data.byPriority ?? [];
+        openDetailModal({
+          title: '任务构成明细',
+          subtitle: `全部 ${data.kpi.total} 个任务`,
+          body: `<table class="detail-table"><thead><tr><th>类型</th><th>数量</th><th>占比</th></tr></thead>
+          <tbody>${types
+            .map(
+              (item) => `<tr><td>${escapeHtml(item.name)}</td><td>${item.count}</td><td>${
+                data.kpi.total ? Math.round((item.count / data.kpi.total) * 100) : 0
+              }%</td></tr>`,
+            )
+            .join('')}</tbody></table>
+          <table class="detail-table" style="margin-top:14px"><thead><tr><th>优先级</th><th>数量</th><th>占比</th></tr></thead>
+          <tbody>${priorities
+            .map(
+              (item) => `<tr><td>${escapeHtml(item.name)}</td><td>${item.count}</td><td>${
+                data.kpi.total ? Math.round((item.count / data.kpi.total) * 100) : 0
+              }%</td></tr>`,
+            )
+            .join('')}</tbody></table>`,
+        });
+      },
+      risk: () =>
+        openDetailModal({
+          title: '风险预警明细',
+          subtitle: '逾期任务与 WIP 超限列',
+          body: `${statStrip([
+            { label: '逾期', value: data.kpi.overdue, unit: '个' },
+            { label: 'WIP 超限', value: exceededCols.length, unit: '列' },
+            { label: '已达上限', value: atLimitCols.length, unit: '列' },
+          ])}
+          ${
+            exceededCols.length || atLimitCols.length
+              ? `<div class="detail-wip">${exceededCols
+                  .map(
+                    (row) =>
+                      `<div class="detail-wip-row danger"><b>${escapeHtml(row.name)}</b><span>超限 ${
+                        row.count
+                      } / ${row.limit}</span></div>`,
+                  )
+                  .join('')}${atLimitCols
+                  .map(
+                    (row) =>
+                      `<div class="detail-wip-row"><b>${escapeHtml(row.name)}</b><span>已达上限 ${
+                        row.count
+                      } / ${row.limit}</span></div>`,
+                  )
+                  .join('')}</div>`
+              : '<p class="detail-empty">没有 WIP 超限的列</p>'
+          }
+          ${taskTable(overdueRows, { empty: '当前没有逾期任务' })}`,
+          onMount({ close, modal }) {
+            modal.querySelectorAll('tr[data-task-id]').forEach((row) => {
+              row.addEventListener('click', () => {
+                close({ skipDismiss: true });
+                openTaskDrawer(row.dataset.taskId);
+              });
+            });
+          },
+        }),
+    };
+    handlers[kind]?.();
+  });
+}
+
+function kpiRate(rows) {
+  const created = rows.reduce((sum, row) => sum + (row.created ?? 0), 0);
+  const completed = rows.reduce((sum, row) => sum + (row.completed ?? 0), 0);
+  return created ? Math.round((completed / created) * 100) : 0;
+}
+
+function openHeatDetail(data, memberId, weekIndex) {
+  const week = data.memberWeekly?.weeks?.[weekIndex];
+  const start = week ? new Date(`${week.start}T00:00:00`).getTime() : 0;
+  const end = start + 7 * DAY;
+  const memberName = memberId ? memberById(memberId)?.name ?? '成员' : '未指派';
+  const rows = state.tasks.filter((task) => {
+    if (!task.completedAt) return false;
+    const ts = new Date(task.completedAt).getTime();
+    if (ts < start || ts >= end) return false;
+    return memberId ? task.assigneeId === memberId : !task.assigneeId;
+  });
+  openTaskList({
+    title: `${memberName} · ${week?.label ?? ''} 完成详情`,
+    subtitle: `当周完成 ${rows.length} 个任务`,
+    rows,
+    showCycle: true,
+    empty: '当周没有完成的任务',
   });
 }

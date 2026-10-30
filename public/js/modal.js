@@ -314,6 +314,30 @@ export function openTaskModal({ defaultStatus = null, onCreated } = {}) {
   );
 }
 
+/**
+ * 通用明细弹框：分析看板的卡片/图表点击后展示详细数据。
+ * body 为可信 HTML（由内部构造，任务字段需自行 escape）。
+ */
+export function openDetailModal({ title, subtitle = '', body = '', footer = '', onMount } = {}) {
+  return show(
+    `<div class="modal-head">
+      <div class="detail-head-text">
+        <h3>${escapeHtml(title)}</h3>
+        ${subtitle ? `<p class="detail-sub">${escapeHtml(subtitle)}</p>` : ''}
+      </div>
+      <button class="btn btn-ghost btn-sm" data-close aria-label="关闭">${icon('close', 15)}</button>
+    </div>
+    <div class="modal-body detail-body">${body}</div>
+    ${footer ? `<div class="modal-foot">${footer}</div>` : ''}`,
+    {
+      onMount({ close, modal }) {
+        modal.querySelectorAll('[data-close]').forEach((btn) => btn.addEventListener('click', () => close()));
+        onMount?.({ close, modal });
+      },
+    },
+  );
+}
+
 export function confirmDialog({ title, message, confirmText = '确认', danger = false }) {  return new Promise((resolve) => {
     let settled = false;
     const finish = (value) => {

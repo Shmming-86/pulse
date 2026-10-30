@@ -1,6 +1,6 @@
 {
   "name": "kanban-pulse",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "private": true,
   "type": "module",
   "description": "小团队任务跟踪与分析看板（JIRA / Plane 风格）",
