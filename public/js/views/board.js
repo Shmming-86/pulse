@@ -29,60 +29,89 @@ let draggedId = null;
 let menuEl = null;
 let menuCleanup = null;
 
+/** 难度刻度：4 格，比「较难 / 困难」文字更省空间，完整含义在 title 与抽屉里 */
+function difficultyMeter(task) {
+  if (!task.difficulty) return '';
+  const levels = ['easy', 'normal', 'hard', 'xhard'];
+  const level = levels.indexOf(task.difficulty) + 1;
+  const meta = difficultyMeta(task.difficulty);
+  const bars = [1, 2, 3, 4]
+    .map((i) => `<i class="${i <= level ? 'on' : ''}"></i>`)
+    .join('');
+  return `<span class="diff-meter" style="--diff-color:${meta.color}" title="难易程度：${escapeHtml(
+    meta.name,
+  )}" aria-label="难易程度：${escapeHtml(meta.name)}">${bars}</span>`;
+}
+
 function cardHtml(task) {
   const priority = priorityMeta(task.priority);
   const type = typeMeta(task.type);
   const member = memberById(task.assigneeId);
   const due = dueInfo(task.dueDate, isDoneStatus(task.status));
   const doneSubtasks = task.subtasks.filter((item) => item.done).length;
+  // 标签最多两个，其余折成 +N，避免卡片被标签撑爆
+  const visibleLabels = task.labels.slice(0, 2);
+  const restLabels = task.labels.length - visibleLabels.length;
+  const assigneeName = member ? `${member.name} · ${member.role}` : '未指派';
 
-  return `<article class="card" draggable="true" data-task-id="${task.id}">
-    <div class="card-top">
-      <span class="card-type" style="color:${type.color};background:${type.color}18" title="任务类型：${escapeHtml(
+  return `<article class="card" draggable="true" data-task-id="${task.id}" data-priority="${task.priority}">
+    <header class="card-head">
+      <span class="card-type-icon" style="color:${type.color};background:${type.color}14" title="任务类型：${escapeHtml(
         type.name,
-      )}">${icon(typeIconName(type.id), 12)}<span>${escapeHtml(type.name)}</span></span>
+      )}">${icon(typeIconName(type.id), 14)}</span>
       <span class="card-key">${escapeHtml(task.key)}</span>
+      ${
+        type.id === 'task'
+          ? ''
+          : `<span class="card-type-name" style="color:${type.color}">${escapeHtml(type.name)}</span>`
+      }
       <button class="card-avatar" data-assignee-btn="${task.id}" title="切换执行人：${escapeHtml(
-        member ? `${member.name} · ${member.role}` : '未指派',
-      )}" aria-label="切换执行人">${avatarHtml(member)}</button>
-    </div>
+        assigneeName,
+      )}" aria-label="切换执行人：${escapeHtml(assigneeName)}">
+        ${
+          member
+            ? avatarHtml(member, 'avatar-card')
+            : `<span class="avatar-ghost" aria-hidden="true">${icon('plus', 12)}</span>`
+        }
+      </button>
+    </header>
+
     <div class="card-title">${escapeHtml(task.title)}</div>
+
     ${
-      task.labels.length
-        ? `<div class="card-labels">${task.labels
+      visibleLabels.length
+        ? `<div class="card-labels">${visibleLabels
             .map((label) => `<span class="chip chip-label">${escapeHtml(label)}</span>`)
-            .join('')}</div>`
+            .join('')}${
+            restLabels > 0 ? `<span class="chip chip-label chip-more">+${restLabels}</span>` : ''
+          }</div>`
         : ''
     }
-    <div class="card-meta">
-      <span class="chip chip-priority-${priority.id}"><i class="chip-dot" style="background:${
-        priority.color
-      }"></i>${escapeHtml(priority.name)}</span>
+
+    <footer class="card-foot">
+      <span class="prio prio-${priority.id}" title="优先级：${escapeHtml(priority.name)}">
+        <i style="background:${priority.color}"></i>${escapeHtml(priority.name)}
+      </span>
       ${
         due
-          ? `<span class="${due.cls}">${icon('calendar', 10)}${escapeHtml(due.text)}</span>`
+          ? `<span class="due ${due.overdue ? 'due-over' : due.soon ? 'due-soon' : ''}" title="截止日期">${icon(
+              'calendar',
+              12,
+            )}${escapeHtml(due.text)}</span>`
           : ''
       }
-      <span class="meta-right">
+      <span class="foot-right">
         ${
           task.subtasks.length
-            ? `<span class="sub-progress" title="子项完成度">${icon('subtask', 11)}${doneSubtasks}/${
-                task.subtasks.length
-              }</span>`
+            ? `<span class="sub-progress" title="子项完成度 ${doneSubtasks}/${task.subtasks.length}">${icon(
+                'subtask',
+                12,
+              )}${doneSubtasks}/${task.subtasks.length}</span>`
             : ''
         }
-        ${
-          task.difficulty
-            ? (() => {
-                const d = difficultyMeta(task.difficulty);
-                return `<span class="diff-badge" style="color:${d.color};background:${d.color}18" title="难易程度：${escapeHtml(
-                  d.name,
-                )}">${escapeHtml(d.name)}</span>`;
-              })()
-            : ''
-        }
+        ${difficultyMeter(task)}
       </span>
-    </div>
+    </footer>
   </article>`;
 }
 
