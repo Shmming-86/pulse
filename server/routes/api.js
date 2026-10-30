@@ -76,7 +76,7 @@ export function registerApiRoutes(
     taskService.removeSubtask(params.id, params.subtaskId),
   );
 
-  router.get('/api/analytics', () => analyticsService.overview());
+  router.get('/api/analytics', ({ query }) => analyticsService.overview({ weeks: query.get('weeks') }));
 
   router.get('/api/activity', ({ query }) => {
     const limit = Number(query.get('limit') ?? 40);
