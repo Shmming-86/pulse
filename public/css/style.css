@@ -3848,41 +3848,30 @@ select {
     box-shadow 0.18s ease;
 }
 
-/* 拖动中的列轻微抬起 + 缩小，制造"拿起来"的手感 */
+/* 选中的列：整列放大并抬起，其余列让位后即形成"落位空档" */
 .column.col-dragging {
-  opacity: 0.62;
-  transform: scale(0.985);
+  transform: scale(1.03);
+  z-index: 5;
   border-color: var(--accent-border);
-  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.12);
+  box-shadow: 0 18px 36px rgba(16, 24, 40, 0.16);
+  transition: transform 0.18s cubic-bezier(0.32, 0.72, 0, 1), box-shadow 0.18s ease,
+    border-color 0.18s ease;
 }
 
-/* 落点指示线呼吸，提示可以松手 */
-.column.drop-before::before,
-.column.drop-after::after {
-  animation: colDropPulse 0.9s ease-in-out infinite;
-}
-
-@keyframes colDropPulse {
-  0%,
-  100% {
-    opacity: 0.45;
-    transform: scaleY(0.94);
-  }
-  50% {
-    opacity: 1;
-    transform: scaleY(1);
-  }
+.column.col-dragging .card {
+  cursor: grabbing;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .column,
-  .column.col-dragging {
+  .column {
     transition: none;
+  }
+  .column.col-dragging {
     transform: none;
   }
-  .column.drop-before::before,
-  .column.drop-after::after {
-    animation: none;
-    opacity: 1;
-  }
+}
+
+/* .board 作为定位参考，保证列 offsetLeft 与指针坐标同一坐标系 */
+.board {
+  position: relative;
 }
