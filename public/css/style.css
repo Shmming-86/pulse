@@ -3687,13 +3687,6 @@ select {
   place-items: center;
 }
 
-/* 非默认类型（需求/缺陷/优化）在编号后补一个类型名，默认「任务」不显示 */
-.card-type-name {
-  font-size: 10px;
-  font-weight: 620;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
 
 /* ============================================================
    v1.12：卡片放大 + 列拖拽排序
@@ -3842,4 +3835,54 @@ select {
 
 .col-head:hover .col-menu-btn {
   opacity: 1;
+}
+
+/* ============================================================
+   v1.13：列拖拽动效
+   ============================================================ */
+.column {
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    transform 0.18s cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 0.18s ease;
+}
+
+/* 拖动中的列轻微抬起 + 缩小，制造"拿起来"的手感 */
+.column.col-dragging {
+  opacity: 0.62;
+  transform: scale(0.985);
+  border-color: var(--accent-border);
+  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.12);
+}
+
+/* 落点指示线呼吸，提示可以松手 */
+.column.drop-before::before,
+.column.drop-after::after {
+  animation: colDropPulse 0.9s ease-in-out infinite;
+}
+
+@keyframes colDropPulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scaleY(0.94);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .column,
+  .column.col-dragging {
+    transition: none;
+    transform: none;
+  }
+  .column.drop-before::before,
+  .column.drop-after::after {
+    animation: none;
+    opacity: 1;
+  }
 }

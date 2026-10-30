@@ -1,6 +1,6 @@
 # Pulse 看板 · 部署与运维手册
 
-> 适用版本：v1.12.0 ｜ 更新日期：2026-10-30
+> 适用版本：v1.13.0 ｜ 更新日期：2026-10-30
 >
 > Pulse 看板是一个面向小团队（5~20 人）的任务跟踪与效能分析系统，对标 JIRA / Plane 的核心能力：看板拖拽、任务键、类型/优先级/难易程度、成员负载、累计流图与吞吐分析、**看板列自定义**。**零 npm 依赖**（SQLite 使用 Node 内置 `node:sqlite`），单进程 Node.js 即可运行，非常适合内网服务器、云主机或 NAS 部署。
 
@@ -265,7 +265,7 @@ docker compose down && docker compose up -d --build
 # 升级（裸机）
 systemctl stop kanban-pulse
 cp -r data /tmp/kanban-data-backup        # 数据先备份
-tar -xzf kanban-pulse-1.12.0.tar.gz -C /opt/kanban-pulse --strip-components=1
+tar -xzf kanban-pulse-1.13.0.tar.gz -C /opt/kanban-pulse --strip-components=1
 systemctl start kanban-pulse
 
 # 回滚：换回旧版本包重新解压启动即可；数据库 schema 通过版本化迁移管理，向前兼容
@@ -276,7 +276,7 @@ systemctl start kanban-pulse
 **关于 schema 迁移**：启动时自动执行，日志会打印 `数据库迁移已应用`（含 version 与 name）：
 
 - version=2：新增 `tasks.started_at`，从任务历史回填「首次进入开始列」的时间
-- version=3（v1.12.0）：新增 `tasks.difficulty`，把旧的数字 `estimate` 折算为难度档位
+- version=3（v1.13.0）：新增 `tasks.difficulty`，把旧的数字 `estimate` 折算为难度档位
   （≤2 简单 / ≤4 一般 / ≤6 较难 / >6 困难）；`estimate` 列保留但不再使用
 
 回填不修改原有数据，可安全重复执行。
