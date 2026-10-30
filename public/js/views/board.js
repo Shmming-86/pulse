@@ -16,6 +16,7 @@ import {
   taskById,
   priorityMeta,
   typeMeta,
+  difficultyMeta,
 } from '../state.js';
 import { toast } from '../toast.js';
 import { openTaskDrawer } from '../drawer.js';
@@ -70,7 +71,16 @@ function cardHtml(task) {
               }</span>`
             : ''
         }
-        ${task.estimate ? `<span class="points" title="预估点数">${task.estimate}</span>` : ''}
+        ${
+          task.difficulty
+            ? (() => {
+                const d = difficultyMeta(task.difficulty);
+                return `<span class="diff-badge" style="color:${d.color};background:${d.color}18" title="难易程度：${escapeHtml(
+                  d.name,
+                )}">${escapeHtml(d.name)}</span>`;
+              })()
+            : ''
+        }
       </span>
     </div>
   </article>`;

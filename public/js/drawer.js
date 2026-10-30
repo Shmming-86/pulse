@@ -157,10 +157,18 @@ function render() {
       <label for="d-due">截止日期</label>
       <input id="d-due" type="date" data-field="dueDate" value="${task.dueDate ?? ''}" />
 
-      <label for="d-estimate">预估点数</label>
-      <input id="d-estimate" type="number" min="0" max="100" step="1" data-field="estimate" value="${
-        task.estimate ?? ''
-      }" placeholder="未估点" />
+      <label for="d-difficulty">难易程度</label>
+      <select id="d-difficulty" data-field="difficulty">
+        <option value="" ${task.difficulty ? '' : 'selected'}>未评估</option>
+        ${(state.meta.difficulties ?? [])
+          .map(
+            (item) =>
+              `<option value="${item.id}" ${
+                item.id === task.difficulty ? 'selected' : ''
+              }>${escapeHtml(item.name)}</option>`,
+          )
+          .join('')}
+      </select>
 
       <label for="d-type">类型</label>
       <select id="d-type" data-field="type">
@@ -443,7 +451,7 @@ function ensureBound() {
     // 标题与描述由 blur 处理，避免 change 与 blur 重复提交
     if (name === 'title' || name === 'description') return;
     let value = field.value;
-    if (name === 'estimate') value = value === '' ? null : Number(value);
+    if (name === 'difficulty') value = value === '' ? null : value;
     if (name === 'assigneeId') value = value === '' ? null : value;
     if (name === 'dueDate') value = value === '' ? null : value;
     if (value === (task[name] ?? '')) return;

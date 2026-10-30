@@ -2,6 +2,7 @@ import {
   assignTask,
   isDoneStatus,
   memberById,
+  difficultyWeight,
   openTasksOf,
   startColumnId,
   state,
@@ -21,7 +22,7 @@ function statsOf(member) {
     open: open.length,
     inProgress: open.filter((task) => task.status === startColumnId()).length,
     done: own.length - open.length,
-    points: open.reduce((sum, task) => sum + (task.estimate ?? 0), 0),
+    points: open.reduce((sum, task) => sum + difficultyWeight(task.difficulty), 0),
     overdue: open.filter((task) => task.dueDate && task.dueDate < new Date().toISOString().slice(0, 10))
       .length,
   };
@@ -57,7 +58,7 @@ function memberCardHtml(member, maxPoints) {
     <div class="member-load">
       <span class="load-label">在办工作量</span>
       <div class="load-track"><i style="width:${width}%;background:${member.color}"></i></div>
-      <span class="load-value">${stats.points} 点</span>
+      <span class="load-value">${stats.points} 分</span>
     </div>
     <footer class="member-card-foot">
       <span>${stats.total} 个任务 · ${stats.inProgress} 个进行中</span>

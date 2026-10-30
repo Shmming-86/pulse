@@ -140,7 +140,7 @@ export function buildSeedData(now = Date.now()) {
     const reporter = rand() > 0.5 ? MEMBERS[0] : pick(rand, MEMBERS);
     const priority = pick(rand, ['urgent', 'high', 'high', 'medium', 'medium', 'medium', 'low']);
     const labels = pick(rand, LABEL_GROUPS);
-    const estimate = pick(rand, [1, 2, 2, 3, 3, 5, 8]);
+    const difficulty = pick(rand, ['easy', 'easy', 'normal', 'normal', 'hard', 'xhard']);
     const history = [
       { at: iso(createdAt), field: 'created', from: null, to: 'todo', actorId: reporter.id },
     ];
@@ -210,7 +210,7 @@ export function buildSeedData(now = Date.now()) {
       assigneeId: assignee.id,
       reporterId: reporter.id,
       labels,
-      estimate,
+      difficulty,
       dueDate,
       subtasks,
       order: orderCounter[status]++,

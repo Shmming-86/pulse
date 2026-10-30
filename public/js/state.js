@@ -99,6 +99,23 @@ export function statusMeta(id) {
   return state.meta.statuses.find((item) => item.id === id) ?? { id, name: id, wipLimit: null };
 }
 
+/** 难度元数据：来自 bootstrap 的 meta.difficulties，未评估返回占位对象 */
+export function difficultyMeta(id) {
+  return (
+    (state.meta.difficulties ?? []).find((item) => item.id === id) ?? {
+      id: null,
+      name: '未评估',
+      color: '#8b93a7',
+      weight: 0,
+    }
+  );
+}
+
+/** 难度折算权重（未评估记 0） */
+export function difficultyWeight(id) {
+  return difficultyMeta(id).weight ?? 0;
+}
+
 export function priorityMeta(id) {
   return (
     state.meta.priorities.find((item) => item.id === id) ?? {

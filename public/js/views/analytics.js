@@ -8,7 +8,7 @@ const WEEKLY_METRICS = {
   completed: { label: '完成任务', unit: '个' },
   created: { label: '新建任务', unit: '个' },
   started: { label: '开始任务', unit: '个' },
-  points: { label: '完成点数', unit: '点' },
+  points: { label: '完成难度分', unit: '分' },
 };
 let weeklyMetric = 'completed';
 
@@ -117,7 +117,7 @@ function insights(data) {
   }
   const busiest = byMember.slice().sort((a, b) => b.points - a.points)[0];
   if (busiest && busiest.points > 0) {
-    parts.push(`当前在制工作量最高的是 <strong>${escapeHtml(busiest.name)}</strong>（${busiest.points} 点 / ${busiest.open} 个任务）。`);
+    parts.push(`当前在制工作量最高的是 <strong>${escapeHtml(busiest.name)}</strong>（难度分 ${busiest.points} / ${busiest.open} 个任务）。`);
   }
   const breach = wipBreaches.find((item) => item.exceeded);
   if (breach) parts.push(`「${escapeHtml(breach.name)}」已超过 WIP 上限（${breach.count}/${breach.limit}）。`);
@@ -197,7 +197,7 @@ export function renderAnalytics(root) {
       const share = member.open ? Math.round((member.inProgress / member.open) * 100) : 0;
       return `<div class="bar-row" style="grid-template-columns:96px 1fr 76px">
         <span class="bar-label">${avatarHtml(memberInfo, 'avatar-sm')}${escapeHtml(member.name)}</span>
-        <div class="bar-track" title="未完成任务 ${member.open} 个 / 估点 ${member.points} / 进行中 ${member.inProgress} 个">
+        <div class="bar-track" title="未完成任务 ${member.open} 个 / 难度分 ${member.points} / 进行中 ${member.inProgress} 个">
           <div style="width:${width}%;height:100%;background:#c7c8f5;border-radius:4px;display:flex">
             <div style="width:${share}%;height:100%;background:#5b5bd6;border-radius:4px"></div>
           </div>
@@ -229,7 +229,7 @@ export function renderAnalytics(root) {
         '个',
         kpi.overdue ? `<span class="down">需要优先处理</span>` : '当前无逾期',
       )}
-      ${kpiCard('在制工作量', kpi.wipPoints, '点', `平均交付周期 ${kpi.avgLead} 天`)}
+      ${kpiCard('在制工作量', kpi.wipPoints, '分', `平均交付周期 ${kpi.avgLead} 天`)}
     </div>
 
     <div class="chart-grid">
@@ -287,7 +287,7 @@ export function renderAnalytics(root) {
         <div class="panel-head">
           <div>
             <div class="panel-title">成员负载</div>
-            <div class="panel-sub">深色为进行中占比，按剩余估点排序</div>
+            <div class="panel-sub">深色为进行中占比，按剩余难度分排序</div>
           </div>
         </div>
         ${memberBars}

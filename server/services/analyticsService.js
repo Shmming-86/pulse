@@ -1,4 +1,4 @@
-import { PRIORITIES, TYPES } from '../domain.js';
+import { difficultyWeight, PRIORITIES, TYPES } from '../domain.js';
 
 const DAY = 86_400_000;
 const WEEK = 7 * DAY;
@@ -203,7 +203,7 @@ export function createAnalyticsService({ tasks, members, columns }) {
           color: member.color,
           open: open.length,
           inProgress: open.filter((task) => task.status === startColumnId).length,
-          points: open.reduce((sum, task) => sum + (task.estimate ?? 0), 0),
+          points: open.reduce((sum, task) => sum + difficultyWeight(task.difficulty), 0),
           done30d: finished.length,
           urgent: open.filter((task) => task.priority === 'urgent').length,
         };
@@ -249,7 +249,7 @@ export function createAnalyticsService({ tasks, members, columns }) {
           const index = weekIndex(finished);
           if (index >= 0) {
             bump(owner, index, 'completed');
-            bump(owner, index, 'points', task.estimate ?? 0);
+            bump(owner, index, 'points', difficultyWeight(task.difficulty));
             if (started && finished >= started) {
               owner.weeks[index].cycleSum += (finished - started) / DAY;
               owner.weeks[index].cycleCount += 1;
@@ -330,7 +330,7 @@ export function createAnalyticsService({ tasks, members, columns }) {
           avgCycle: round1(avgCycle),
           medianCycle: round1(median(cycleTimes)),
           avgLead: round1(leadTimes.length ? leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length : 0),
-          wipPoints: openRows.reduce((sum, task) => sum + (task.estimate ?? 0), 0),
+          wipPoints: openRows.reduce((sum, task) => sum + difficultyWeight(task.difficulty), 0),
         },
         columns: columnList.map((column) => ({
           id: column.id,

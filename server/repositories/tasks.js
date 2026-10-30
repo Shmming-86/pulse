@@ -10,6 +10,7 @@ const FIELD_MAP = {
   assigneeId: 'assignee_id',
   reporterId: 'reporter_id',
   estimate: 'estimate',
+  difficulty: 'difficulty',
   dueDate: 'due_date',
   position: 'position',
   updatedAt: 'updated_at',
@@ -33,6 +34,7 @@ function mapTask(row, extras) {
     reporterId: row.reporter_id ?? null,
     labels: extras.labels,
     estimate: row.estimate ?? null,
+    difficulty: row.difficulty ?? null,
     dueDate: row.due_date ?? null,
     subtasks: extras.subtasks,
     order: row.position,
@@ -151,8 +153,9 @@ export function createTaskRepo(db) {
         db.prepare(
           `INSERT INTO tasks
              (id, seq, task_key, project_id, title, description, status_id, type, priority,
-              assignee_id, reporter_id, estimate, due_date, position, created_at, updated_at, started_at, completed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              assignee_id, reporter_id, estimate, difficulty, due_date, position,
+              created_at, updated_at, started_at, completed_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
           task.id,
           seq,
@@ -166,6 +169,7 @@ export function createTaskRepo(db) {
           task.assigneeId ?? null,
           task.reporterId ?? null,
           task.estimate ?? null,
+          task.difficulty ?? null,
           task.dueDate ?? null,
           task.order ?? 0,
           task.createdAt,

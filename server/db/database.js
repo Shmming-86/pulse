@@ -117,6 +117,25 @@ const MIGRATIONS = [
     },
   },
   {
+    version: 3,
+    name: 'task_difficulty',
+    up(db) {
+      db.exec('ALTER TABLE tasks ADD COLUMN difficulty TEXT');
+
+      // 老数据的数字点数折算成难度档位，避免历史任务全部显示「未评估」
+      db.exec(`
+        UPDATE tasks SET difficulty = CASE
+          WHEN estimate IS NULL OR estimate <= 0 THEN NULL
+          WHEN estimate <= 2 THEN 'easy'
+          WHEN estimate <= 4 THEN 'normal'
+          WHEN estimate <= 6 THEN 'hard'
+          ELSE 'xhard'
+        END
+        WHERE difficulty IS NULL
+      `);
+    },
+  },
+  {
     version: 2,
     name: 'task_started_at',
     up(db) {
