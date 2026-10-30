@@ -61,11 +61,6 @@ function cardHtml(task) {
         type.name,
       )}">${icon(typeIconName(type.id), 14)}</span>
       <span class="card-key">${escapeHtml(task.key)}</span>
-      ${
-        type.id === 'task'
-          ? ''
-          : `<span class="card-type-name" style="color:${type.color}">${escapeHtml(type.name)}</span>`
-      }
       <button class="card-avatar" data-assignee-btn="${task.id}" title="切换执行人：${escapeHtml(
         assigneeName,
       )}" aria-label="切换执行人：${escapeHtml(assigneeName)}">
@@ -114,6 +109,39 @@ function cardHtml(task) {
       </span>
     </footer>
   </article>`;
+}
+
+/**
+ * 列换位动画（FLIP）：重渲染后先按旧位置偏移，再过渡回新位置，
+ * 让列在拖拽落位时平滑滑动而不是瞬间跳变。
+ */
+function animateColumnReorder(root, prevRects) {
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const cols = Array.from(root.querySelectorAll('.column'));
+  const moved = [];
+  cols.forEach((col) => {
+    const prev = prevRects.get(col.dataset.status);
+    if (!prev) return;
+    const delta = prev.left - col.getBoundingClientRect().left;
+    if (Math.abs(delta) < 1) return;
+    col.style.transition = 'none';
+    col.style.transform = `translateX(${delta}px)`;
+    moved.push(col);
+  });
+  if (!moved.length) return;
+  requestAnimationFrame(() => {
+    void root.offsetWidth; // 强制回流，确保从偏移位置开始过渡
+    moved.forEach((col) => {
+      col.style.transition = 'transform 340ms cubic-bezier(0.32, 0.72, 0, 1)';
+      col.style.transform = '';
+    });
+  });
+  window.setTimeout(() => {
+    moved.forEach((col) => {
+      col.style.transition = '';
+      col.style.transform = '';
+    });
+  }, 420);
 }
 
 function clearColumnDropMarks(root) {
@@ -201,8 +229,6 @@ export function closeColumnMenu() {
 
 function openColumnMenu(anchor, column) {
   closeColumnMenu();
-  const list = columns();
-  const index = list.findIndex((item) => item.id === column.id);
   const rect = anchor.getBoundingClientRect();
   const menu = document.createElement('div');
   menu.className = 'column-menu';
@@ -210,12 +236,6 @@ function openColumnMenu(anchor, column) {
   menu.innerHTML = `
     <div class="column-menu-head">${escapeHtml(column.name)}</div>
     <button class="column-menu-item" data-action="edit" role="menuitem">${icon('edit', 13)}编辑列</button>
-    <button class="column-menu-item" data-action="left" role="menuitem" ${
-      index <= 0 ? 'disabled' : ''
-    }>◀ 左移</button>
-    <button class="column-menu-item" data-action="right" role="menuitem" ${
-      index >= list.length - 1 ? 'disabled' : ''
-    }>右移 ▶</button>
     <div class="column-menu-sep"></div>
     <button class="column-menu-item danger" data-action="delete" role="menuitem">${icon('trash', 13)}删除列</button>`;
   document.body.appendChild(menu);
@@ -259,12 +279,6 @@ function openColumnMenu(anchor, column) {
     }
     if (action === 'delete') {
       openColumnDeleteDialog({ column });
-      return;
-    }
-    try {
-      await moveColumn(column.id, action === 'left' ? index - 1 : index + 1);
-    } catch (error) {
-      toast(error.message, 'error');
     }
   });
 }
@@ -382,6 +396,10 @@ function bind(root) {
     event.preventDefault();
 
     const movingId = columnDragId;
+    const prevRects = new Map();
+    root.querySelectorAll('.column').forEach((col) => {
+      prevRects.set(col.dataset.status, col.getBoundingClientRect());
+    });
     const ids = columns().map((item) => item.id);
     const from = ids.indexOf(movingId);
     if (from === -1) {
@@ -402,7 +420,9 @@ function bind(root) {
 
     clearColumnDrag(root);
     if (insert === from) return; // 位置没变，不做请求
-    moveColumn(movingId, insert).catch((error) => toast(error.message, 'error'));
+    moveColumn(movingId, insert)
+      .then(() => animateColumnReorder(root, prevRects))
+      .catch((error) => toast(error.message, 'error'));
   });
 
   root.querySelectorAll('.card-list').forEach((list) => {
