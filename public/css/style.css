@@ -3510,3 +3510,187 @@ select {
 .an-kpi-info:hover::before,
 .an-kpi-info:focus-visible::before { opacity: 1; }
 .an-kpi-note { margin-left: 5px; font-size: 10px; color: var(--text-3); }
+
+/* ============================================================
+   任务卡片（v1.11 信息分层：类型图标 / 大处理人 / 精简 meta）
+   ============================================================ */
+.card {
+  padding: 10px 11px 9px;
+  border-radius: 10px;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 7px;
+}
+
+/* 类型：14px 彩色图标 + 同色淡底块，替代原来的小字胶囊 */
+.card-type-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.card-type-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.card-key {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: var(--text-3);
+}
+
+/* 处理人：28px，未指派为虚线圈 */
+.card-avatar {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 50%;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.card-avatar .avatar,
+.avatar.avatar-card {
+  width: 28px;
+  height: 28px;
+  font-size: 11px;
+  box-shadow: 0 0 0 1px rgba(17, 24, 39, 0.08);
+}
+
+.card-avatar:hover .avatar {
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.card-title {
+  font-size: 12.9px;
+  font-weight: 560;
+  line-height: 1.5;
+  -webkit-line-clamp: 2;
+}
+
+.card-labels {
+  margin-top: 7px;
+  gap: 4px;
+}
+
+.chip-label {
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 16px;
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+
+.chip-more {
+  color: var(--text-3);
+}
+
+.card-foot {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 8px;
+  font-size: 10.5px;
+  color: var(--text-3);
+  min-width: 0;
+}
+
+.card-foot .prio {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 560;
+  color: var(--text-2);
+}
+
+.card-foot .prio i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.card-foot .due {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-foot .due-over {
+  color: #b91c1c;
+}
+
+.card-foot .due-soon {
+  color: #b45309;
+}
+
+.card-foot .foot-right {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.card-foot .sub-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+
+/* 难度：4 格刻度 */
+.diff-meter {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding-bottom: 1px;
+}
+
+.diff-meter i {
+  display: block;
+  width: 3px;
+  height: 6px;
+  border-radius: 1px;
+  background: #e3e6ee;
+}
+
+.diff-meter i:nth-child(2) { height: 8px; }
+.diff-meter i:nth-child(3) { height: 10px; }
+.diff-meter i:nth-child(4) { height: 12px; }
+.diff-meter i.on { background: var(--diff-color, #5b5bd6); }
+
+.avatar-ghost {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px dashed var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-3);
+  display: grid;
+  place-items: center;
+}
+
+/* 非默认类型（需求/缺陷/优化）在编号后补一个类型名，默认「任务」不显示 */
+.card-type-name {
+  font-size: 10px;
+  font-weight: 620;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
