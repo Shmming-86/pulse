@@ -28,7 +28,6 @@ let suppressClick = false;
 let draggedId = null;
 let columnDragId = null;
 let columnDragTarget = null;
-let columnDragStartX = null;
 let menuEl = null;
 let menuCleanup = null;
 
@@ -117,11 +116,12 @@ function cardHtml(task) {
  * 列换位动画（FLIP）：重渲染后先按旧位置偏移，再过渡回新位置，
  * 让列在拖拽落位时平滑滑动而不是瞬间跳变。
  */
-function animateColumnReorder(root, prevRects) {
+function animateColumnReorder(root, prevRects, { skipId } = {}) {
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
   const cols = Array.from(root.querySelectorAll('.column'));
   const moved = [];
   cols.forEach((col) => {
+    if (skipId && col.dataset.status === skipId) return;
     const prev = prevRects.get(col.dataset.status);
     if (!prev) return;
     const delta = prev.left - col.getBoundingClientRect().left;
@@ -160,7 +160,7 @@ function previewColumnGap(cols, source, insert) {
     const finalIndex = m < insert ? m : m + 1;
     const oldIndex = m < sourceIndex ? m : m + 1;
     const offset = (finalIndex - oldIndex) * step;
-    col.style.transition = 'transform 200ms cubic-bezier(0.32, 0.72, 0, 1)';
+    col.style.transition = 'transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1)';
     col.style.transform = offset ? `translateX(${offset}px)` : '';
     m += 1;
   });
@@ -181,7 +181,6 @@ function resetColumnGaps(root) {
 function clearColumnDrag(root) {
   columnDragId = null;
   columnDragTarget = null;
-  columnDragStartX = null;
   root.querySelectorAll('.column').forEach((col) => {
     col.classList.remove('col-dragging');
     col.style.transform = '';
@@ -377,7 +376,6 @@ function bind(root) {
           return;
         }
         columnDragId = head.dataset.colId;
-        columnDragStartX = event.clientX;
         head.closest('.column')?.classList.add('col-dragging');
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', `column:${columnDragId}`);
@@ -406,9 +404,8 @@ function bind(root) {
       card?.classList.remove('dragging');
       root.querySelectorAll('.column').forEach((col) => col.classList.remove('drag-over'));
       if (columnDragId) {
-        // 拖拽被取消（没落在列上）：撤销让位并按服务端顺序重绘
+        // 取消拖拽：DOM 顺序全程未改动，动画归位即可
         resetColumnGaps(root);
-        renderBoard(root);
       }
       clearColumnDrag(root);
       draggedId = null;
@@ -446,15 +443,18 @@ function bind(root) {
     }
     columnDragTarget = insert;
 
-    // 列吸附到目标空档（而不是跟着指针飘），避免遮挡相邻列
-    const step = others[0] && others[1] ? others[1].offsetLeft - others[0].offsetLeft : source.offsetWidth + 12;
+    // 以目标空档为基准做阻尼跟随：整列全程"贴着手"移动，跨槽时也不会瞬跳
+    const step = others[1] ? others[1].offsetLeft - others[0].offsetLeft : source.offsetWidth + 12;
     const fromIndex = cols.indexOf(source);
-    const dx = (insert - fromIndex) * step;
-    source.style.transition = columnDragStartX === null
-      ? 'none'
-      : 'transform 200ms cubic-bezier(0.32, 0.72, 0, 1)';
-    source.style.transform = `translateX(${dx}px) scale(1.03)`;
-    columnDragStartX = 1; // 首次之后启用过渡
+    const gapOffset = (insert - fromIndex) * step;
+    const gapCenter = source.offsetLeft + gapOffset + source.offsetWidth / 2;
+    const delta = Math.max(-step * 0.42, Math.min(step * 0.42, (pointerX - gapCenter) * 0.34));
+    const tilt = Math.max(-0.6, Math.min(0.6, (pointerX - gapCenter) / 900));
+
+    source.style.transition = 'transform 150ms cubic-bezier(0.22, 0.61, 0.36, 1)';
+    source.style.transform = `translateX(${(gapOffset + delta).toFixed(1)}px) scale(1.035) rotate(${tilt.toFixed(
+      2,
+    )}deg)`;
 
     previewColumnGap(cols, source, insert);
   });
@@ -473,17 +473,28 @@ function bind(root) {
       prevRects.set(col.dataset.status, col.getBoundingClientRect());
     });
 
-    resetColumnGaps(root);
-    clearColumnDrag(root);
+    // 先停止后续 dragover 处理，但保留当前视觉：等新 DOM 渲染后由 FLIP 接管
+    columnDragId = null;
+
     if (insert === null || from === -1 || insert === from) {
-      renderBoard(root); // 位置没变：重绘清掉临时位移
+      resetColumnGaps(root);
+      clearColumnDrag(root);
       return;
     }
+
     moveColumn(movingId, insert)
-      .then(() => animateColumnReorder(root, prevRects))
+      .then(() => {
+        animateColumnReorder(root, prevRects, { skipId: movingId });
+        const settled = root.querySelector(`.column[data-status="${movingId}"]`);
+        if (settled) {
+          settled.classList.add('col-settle');
+          window.setTimeout(() => settled.classList.remove('col-settle'), 280);
+        }
+      })
       .catch((error) => {
         toast(error.message, 'error');
-        renderBoard(root);
+        resetColumnGaps(root);
+        clearColumnDrag(root);
       });
   });
 
