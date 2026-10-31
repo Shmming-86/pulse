@@ -3799,26 +3799,6 @@ select {
   color: var(--text-3);
 }
 
-.column.col-dragging {
-  opacity: 0.5;
-}
-
-/* 落点指示线 */
-.column.drop-before::before,
-.column.drop-after::after {
-  content: '';
-  position: absolute;
-  top: 6px;
-  bottom: 6px;
-  width: 2px;
-  border-radius: 2px;
-  background: var(--accent);
-  z-index: 4;
-}
-
-.column.drop-before::before { left: -7px; }
-.column.drop-after::after { right: -7px; }
-
 /* 列头操作按钮成组靠右，避免与列名/计数分散 */
 .col-actions {
   margin-left: auto;
@@ -3848,14 +3828,16 @@ select {
     box-shadow 0.18s ease;
 }
 
-/* 选中的列：整列放大并抬起，其余列让位后即形成"落位空档" */
+/* 选中的列：整列放大并抬起；transform 由 JS 逐帧控制（70ms 跟手），这里只管阴影/边框 */
 .column.col-dragging {
-  transform: scale(1.03);
+  transform: scale(1.035);
   z-index: 5;
   border-color: var(--accent-border);
   box-shadow: 0 18px 36px rgba(16, 24, 40, 0.16);
-  transition: transform 0.18s cubic-bezier(0.32, 0.72, 0, 1), box-shadow 0.18s ease,
-    border-color 0.18s ease;
+  /* 轻微透明：跟随指针时会盖住邻列，留一点"悬浮"的通透感 */
+  opacity: 0.94;
+  will-change: transform;
+  transition: box-shadow 0.16s ease, border-color 0.16s ease, opacity 0.16s ease;
 }
 
 .column.col-dragging .card {
@@ -3883,25 +3865,3 @@ select {
   will-change: transform;
 }
 
-/* 松手后：被拖列从放大状态平滑回落到原始大小（重渲染会换节点，用动画衔接） */
-@keyframes columnSettle {
-  from {
-    transform: scale(1.035);
-    box-shadow: 0 18px 36px rgba(16, 24, 40, 0.16);
-    border-color: var(--accent-border);
-  }
-  to {
-    transform: scale(1);
-    box-shadow: 0 0 0 rgba(16, 24, 40, 0);
-  }
-}
-
-.column.col-settle {
-  animation: columnSettle 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .column.col-settle {
-    animation: none;
-  }
-}
