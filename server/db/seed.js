@@ -10,6 +10,11 @@ const now = () => new Date().toISOString();
  * 迁移只对建库时已有的数据生效，种子/旧 JSON 导入是在迁移之后写入的，
  * 因此初始化结束后需要再跑一次同样的回填。
  */
+/** 旧数据 / 外部导入的任务缺难度：补「一般」（与新建弹框默认一致） */
+export function backfillDifficulty(db) {
+  db.exec("UPDATE tasks SET difficulty = 'normal' WHERE difficulty IS NULL");
+}
+
 export function backfillStartedAt(db) {
   db.exec(`
     UPDATE tasks SET started_at = (
@@ -79,6 +84,7 @@ function insertDataset({ db, repos, data }) {
     ).run(String(value));
 
     backfillStartedAt(db);
+    backfillDifficulty(db);
   });
   return {
     columns: repos.columns.count(),
