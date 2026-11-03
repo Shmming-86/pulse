@@ -67,6 +67,23 @@ function startedAtOf(task, startColumnId) {
   return firstEntryInto(task, startColumnId);
 }
 
+/**
+ * 统一逾期判定（与前端分析页同口径）：
+ * - 已完成：完成时间晚于截止日当天结束时算「逾期交付」，返回逾期天数（>=1）
+ * - 未完成：截止日早于今天（本地零点）算逾期，返回逾期天数（>=1）
+ * - 否则返回 null（未逾期 / 无截止日）
+ */
+function overdueDaysOf(task, now = Date.now()) {
+  if (!task.dueDate) return null;
+  const due = new Date(`${task.dueDate}T00:00:00`).getTime();
+  if (task.completedAt) {
+    const completed = new Date(task.completedAt).getTime();
+    return completed >= due + DAY ? Math.floor((completed - due) / DAY) : null;
+  }
+  const today = startOfDay(now);
+  return due < today ? Math.floor((today - due) / DAY) : null;
+}
+
 function median(values) {
   if (values.length === 0) return 0;
   const sorted = values.slice().sort((a, b) => a - b);
@@ -106,12 +123,7 @@ export function createAnalyticsService({ tasks, members, columns }) {
       }
 
       const overdue = rows
-        .filter(
-          (task) =>
-            !isDone(task.status) &&
-            task.dueDate &&
-            new Date(`${task.dueDate}T00:00:00`).getTime() < today,
-        )
+        .filter((task) => overdueDaysOf(task, now) !== null)
         .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
       const thisWeekStart = startOfWeek(now);
@@ -383,7 +395,7 @@ export function createAnalyticsService({ tasks, members, columns }) {
           dueDate: task.dueDate,
           assigneeId: task.assigneeId,
           priority: task.priority,
-          daysLate: Math.floor((today - new Date(`${task.dueDate}T00:00:00`).getTime()) / DAY),
+          daysLate: overdueDaysOf(task, now),
         })),
         cycleSample: cycleTimes.length,
       };
