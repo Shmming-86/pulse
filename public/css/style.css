@@ -1618,7 +1618,8 @@ select {
 }
 
 .drawer-task-name {
-  flex: 1 1 auto;
+  /* flex-basis 给 120px 下限：即使顶栏空间紧张，名称也保底可见（超出再省略） */
+  flex: 1 1 120px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
