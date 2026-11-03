@@ -109,6 +109,7 @@ function render() {
       type.name,
     )}">${icon(typeIconName(type.id), 13)}<span>${escapeHtml(type.name)}</span></span>
     <span class="drawer-key">${escapeHtml(task.key)}</span>
+    <span class="drawer-task-name" title="${escapeHtml(task.title)}">${escapeHtml(task.title)}</span>
     <span class="chip chip-priority-${priority.id}">${escapeHtml(priority.name)}优先级</span>
     <button class="btn btn-ghost btn-sm" data-act="close" aria-label="关闭">${icon('close', 15)}</button>
   </header>

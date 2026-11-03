@@ -1617,8 +1617,19 @@ select {
   color: var(--text-3);
 }
 
+.drawer-task-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.8px;
+  font-weight: 620;
+  color: var(--text-1);
+}
+
 .drawer-head .btn {
-  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .drawer-body {
@@ -3735,7 +3746,10 @@ select {
 .avatar-ghost {
   width: 30px;
   height: 30px;
-  font-size: 11.5px;
+  /* 首字尽量撑满圆形：16px + 行高 1，字面与边缘只留极小间距 */
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: -0.02em;
 }
 
 .card-title {
