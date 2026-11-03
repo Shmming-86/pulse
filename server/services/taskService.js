@@ -84,8 +84,11 @@ export function createTaskService({ tasks, members, columns, activity, project, 
     }
     if (!partial || input.difficulty !== undefined) {
       const raw = input.difficulty;
-      if (raw === undefined || raw === null || raw === '') {
-        out.difficulty = null;
+      if (raw === undefined) {
+        // 新建时未指定难度：按设计默认「一般」（更新路径不会走到这里）
+        out.difficulty = 'normal';
+      } else if (raw === null || raw === '') {
+        out.difficulty = null; // 明确选择「未评估」
       } else if (DIFFICULTY_IDS.includes(raw)) {
         out.difficulty = raw;
       } else {
