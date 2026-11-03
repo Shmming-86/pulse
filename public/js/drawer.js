@@ -55,9 +55,11 @@ export function openTaskDrawer(id, { onClose } = {}) {
   const panel = drawerEl();
   overlay.hidden = false;
   panel.hidden = false;
+  // render 发生在 hidden 状态时 scrollHeight 测出 0，这里显示后必须重新测一次
   requestAnimationFrame(() => {
     overlay.classList.add('open');
     panel.classList.add('open');
+    growTitle(panel);
   });
   document.body.style.overflow = 'hidden';
 }
@@ -88,6 +90,15 @@ export function refreshDrawer() {
   render();
   const next = drawerEl().querySelector('.drawer-body');
   if (next) next.scrollTop = scrollTop;
+}
+
+/** 把标题输入框高度调整为内容高度；抽屉隐藏时测不到高度，由 openTaskDrawer 显示后再补一次 */
+function growTitle(panel) {
+  const titleEl = panel.querySelector('.d-title');
+  if (!titleEl) return;
+  titleEl.style.height = 'auto';
+  const h = titleEl.scrollHeight;
+  if (h > 0) titleEl.style.height = `${h}px`;
 }
 
 function render() {
@@ -319,10 +330,7 @@ function render() {
   </footer>`;
 
   const titleEl = panel.querySelector('.d-title');
-  const autoGrow = () => {
-    titleEl.style.height = 'auto';
-    titleEl.style.height = `${titleEl.scrollHeight}px`;
-  };
+  const autoGrow = () => growTitle(panel);
   autoGrow();
   titleEl.addEventListener('input', autoGrow);
   titleEl.addEventListener('keydown', (event) => {

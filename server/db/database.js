@@ -117,43 +117,6 @@ const MIGRATIONS = [
     },
   },
   {
-    version: 4,
-    name: 'backfill_missing_defaults',
-    up(db) {
-      // 难度缺省「一般」：与新建任务弹框的默认值保持一致（旧数据无从判断档位）
-      db.exec("UPDATE tasks SET difficulty = 'normal' WHERE difficulty IS NULL");
-
-      // 已完成但没有开始时间：用创建时间兜底，保证周期时间可计算
-      db.exec(
-        'UPDATE tasks SET started_at = created_at WHERE started_at IS NULL AND completed_at IS NOT NULL',
-      );
-
-      // 创建人缺失：以当前负责人兜底（仍未指派的任务保持为空）
-      db.exec(
-        'UPDATE tasks SET reporter_id = assignee_id WHERE reporter_id IS NULL AND assignee_id IS NOT NULL',
-      );
-    },
-  },
-  {
-    version: 3,
-    name: 'task_difficulty',
-    up(db) {
-      db.exec('ALTER TABLE tasks ADD COLUMN difficulty TEXT');
-
-      // 老数据的数字点数折算成难度档位，避免历史任务全部显示「未评估」
-      db.exec(`
-        UPDATE tasks SET difficulty = CASE
-          WHEN estimate IS NULL OR estimate <= 0 THEN NULL
-          WHEN estimate <= 2 THEN 'easy'
-          WHEN estimate <= 4 THEN 'normal'
-          WHEN estimate <= 6 THEN 'hard'
-          ELSE 'xhard'
-        END
-        WHERE difficulty IS NULL
-      `);
-    },
-  },
-  {
     version: 2,
     name: 'task_started_at',
     up(db) {
@@ -179,6 +142,43 @@ const MIGRATIONS = [
             WHERE s.is_start = 1 AND cur.id = tasks.status_id AND cur.position >= s.position
           )
       `);
+    },
+  },
+  {
+    version: 3,
+    name: 'task_difficulty',
+    up(db) {
+      db.exec('ALTER TABLE tasks ADD COLUMN difficulty TEXT');
+
+      // 老数据的数字点数折算成难度档位，避免历史任务全部显示「未评估」
+      db.exec(`
+        UPDATE tasks SET difficulty = CASE
+          WHEN estimate IS NULL OR estimate <= 0 THEN NULL
+          WHEN estimate <= 2 THEN 'easy'
+          WHEN estimate <= 4 THEN 'normal'
+          WHEN estimate <= 6 THEN 'hard'
+          ELSE 'xhard'
+        END
+        WHERE difficulty IS NULL
+      `);
+    },
+  },
+  {
+    version: 4,
+    name: 'backfill_missing_defaults',
+    up(db) {
+      // 难度缺省「一般」：与新建任务弹框的默认值保持一致（旧数据无从判断档位）
+      db.exec("UPDATE tasks SET difficulty = 'normal' WHERE difficulty IS NULL");
+
+      // 已完成但没有开始时间：用创建时间兜底，保证周期时间可计算
+      db.exec(
+        'UPDATE tasks SET started_at = created_at WHERE started_at IS NULL AND completed_at IS NOT NULL',
+      );
+
+      // 创建人缺失：以当前负责人兜底（仍未指派的任务保持为空）
+      db.exec(
+        'UPDATE tasks SET reporter_id = assignee_id WHERE reporter_id IS NULL AND assignee_id IS NOT NULL',
+      );
     },
   },
 ];
