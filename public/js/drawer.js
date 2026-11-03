@@ -5,6 +5,7 @@ import {
   removeSubtask,
   removeTask,
   state,
+  subscribe,
   taskById,
   toggleSubtask,
   typeMeta,
@@ -341,6 +342,26 @@ function ensureBound() {
   const panel = drawerEl();
   if (panel.dataset.bound === '1') return;
   panel.dataset.bound = '1';
+
+  // 状态变化（本端改名 / 其他端同步 / 轮询刷新）时，同步顶栏的任务名称：
+  // 只更新文本，不整块重绘，避免打断正在编辑的标题输入框
+  if (panel.dataset.nameSynced !== '1') {
+    panel.dataset.nameSynced = '1';
+    subscribe(() => {
+      if (!openId) return;
+      const task = taskById(openId);
+      const nameEl = panel.querySelector('.drawer-task-name');
+      if (!task || !nameEl) return;
+      if (nameEl.textContent !== task.title) {
+        nameEl.textContent = task.title;
+        nameEl.title = task.title;
+      }
+      const titleEl = panel.querySelector('.d-title');
+      if (titleEl && document.activeElement !== titleEl && titleEl.value !== task.title) {
+        titleEl.value = task.title;
+      }
+    });
+  }
 
   panel.addEventListener('click', async (event) => {
     const task = taskById(openId);
