@@ -1,6 +1,6 @@
 import {
-  filteredTasks,
   isDoneStatus,
+  listTasks,
   memberById,
   priorityMeta,
   difficultyMeta,
@@ -137,7 +137,7 @@ function rowHtml(task) {
 }
 
 export function renderList(root) {
-  const rows = sorted(filteredTasks());
+  const rows = sorted(listTasks());
   const open = rows.filter((task) => !isDoneStatus(task.status)).length;
 
   root.innerHTML = `<div class="table-wrap">

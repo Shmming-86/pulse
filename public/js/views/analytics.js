@@ -8,7 +8,7 @@ import {
   state,
   statusMeta,
 } from '../state.js';
-import { avatarHtml, escapeHtml } from '../utils.js';
+import { avatarHtml, escapeHtml, startOfToday } from '../utils.js';
 import {
   donutChart,
   emptyChart,
@@ -52,6 +52,23 @@ const cycleDaysOf = (task) => {
 };
 
 const memberNameOf = (task) => memberById(task.assigneeId)?.name ?? '未指派';
+
+/**
+ * 统一逾期判定（与服务端 analyticsService 同口径）：
+ * - 已完成：完成时间晚于截止日当天结束时算「逾期交付」，返回逾期天数（>=1）
+ * - 未完成：截止日早于今天（本地零点）算逾期，返回逾期天数（>=1）
+ * - 否则返回 null
+ */
+const overdueDaysOf = (task) => {
+  if (!task.dueDate) return null;
+  const due = new Date(`${task.dueDate}T00:00:00`).getTime();
+  if (task.completedAt) {
+    const completed = new Date(task.completedAt).getTime();
+    return completed >= due + DAY ? Math.floor((completed - due) / DAY) : null;
+  }
+  const today = startOfToday();
+  return due < today ? Math.floor((today - due) / DAY) : null;
+};
 
 const difficultyBadge = (task) => {
   if (!task.difficulty) return '<span class="detail-muted">未评估</span>';
@@ -178,11 +195,11 @@ export function renderAnalytics(root) {
   });
 
   const openRows = openOf();
-  const overdueRows = openRows
-    .filter((task) => task.dueDate && new Date(`${task.dueDate}T00:00:00`).getTime() < now)
+  const overdueRows = state.tasks
+    .filter((task) => overdueDaysOf(task) !== null)
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   const maxLate = overdueRows.length
-    ? Math.floor((now - new Date(`${overdueRows[0].dueDate}T00:00:00`).getTime()) / DAY)
+    ? Math.max(...overdueRows.map((task) => overdueDaysOf(task)))
     : 0;
 
   // ---- 成员负载 ----
@@ -246,7 +263,7 @@ export function renderAnalytics(root) {
         ? overdueRows
             .slice(0, 3)
             .map((task) => {
-              const days = Math.floor((now - new Date(`${task.dueDate}T00:00:00`).getTime()) / DAY);
+              const days = overdueDaysOf(task);
               return `<button type="button" class="an-risk-item" data-risk-task="${task.id}">
                 <span class="an-risk-key">${escapeHtml(task.key)}</span>
                 <span class="an-risk-title">${escapeHtml(task.title)}</span>
@@ -358,7 +375,7 @@ export function renderAnalytics(root) {
         unit: '个',
         tone: kpi.overdue ? 'danger' : '',
         foot: kpi.overdue ? `最长逾期 ${maxLate} 天` : '当前无逾期',
-        hint: '未完成且截止日期早于今天的任务；最长逾期按最早到期的那个任务计算',
+        hint: '截止日未按时完成的任务：未完成且已过截止日，或已完成但完成时间晚于截止日',
       })}
       ${kpiCard({
         id: 'points',

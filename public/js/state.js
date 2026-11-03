@@ -23,7 +23,7 @@ export const state = {
   analytics: null,
   analyticsWeeks: 8,
   analyticsFetchedAt: 0,
-  filters: { q: '', assigneeId: '', priority: '', type: '' },
+  filters: { q: '', assigneeId: '', priority: '', type: '', status: 'open' },
   /** 看板视图专属显示偏好（列表视图始终展示全部任务） */
   boardView: { hideStaleDone: readHideStalePref() },
   view: 'board',
@@ -133,8 +133,8 @@ export function typeMeta(id) {
 }
 
 export function filtersActive() {
-  const { q, assigneeId, priority, type } = state.filters;
-  return Boolean(q || assigneeId || priority || type);
+  const { q, assigneeId, priority, type, status } = state.filters;
+  return Boolean(q || assigneeId || priority || type || (status && status !== 'open'));
 }
 
 export function filteredTasks() {
@@ -152,6 +152,19 @@ export function filteredTasks() {
       task.labels.some((label) => label.toLowerCase().includes(needle))
     );
   });
+}
+
+/**
+ * 列表视图专用：在通用筛选之上叠加「任务状态」过滤。
+ * status 取值：'open'（未完成，默认）/ 'done'（已完成）/ 'all'（全部）/ 具体列 id。
+ */
+export function listTasks() {
+  const list = filteredTasks();
+  const { status } = state.filters;
+  if (!status || status === 'all') return list;
+  if (status === 'open') return list.filter((task) => !isDoneStatus(task.status));
+  if (status === 'done') return list.filter((task) => isDoneStatus(task.status));
+  return list.filter((task) => task.status === status);
 }
 
 export function tasksByStatus(statusId) {
@@ -220,7 +233,7 @@ export function setFilter(key, value) {
 }
 
 export function clearFilters() {
-  state.filters = { q: '', assigneeId: '', priority: '', type: '' };
+  state.filters = { q: '', assigneeId: '', priority: '', type: '', status: 'open' };
   emit();
 }
 

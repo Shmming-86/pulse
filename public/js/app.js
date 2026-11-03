@@ -6,6 +6,7 @@ import {
   doneColumnId,
   filteredTasks,
   hiddenStaleTasks,
+  listTasks,
   loadAnalytics,
   setFilter,
   staleDoneDays,
@@ -90,7 +91,7 @@ function renderShell() {
           ? state.members.length
           : view === 'board'
             ? boardTasks().length
-            : filteredTasks().length;
+            : listTasks().length;
   $('#page-count').textContent = state.loading && !state.tasks.length ? '—' : String(count);
   document.querySelector('.nav-count[data-count="board"]').textContent = String(
     filteredTasks().filter((task) => task.status !== doneColumnId()).length,
@@ -113,6 +114,10 @@ function renderShell() {
         : '当前显示全部任务，点击恢复「隐藏完成超过 7 天」';
     }
   }
+
+  // 「任务状态」筛选仅列表视图展示；看板按列呈现所有状态，无需该筛选
+  const statusWrap = $('#filter-status-wrap');
+  if (statusWrap) statusWrap.hidden = view !== 'list';
 
   if (state.project) {
     $('#project-name').textContent = state.project.name;
@@ -156,7 +161,8 @@ function renderShell() {
     state.filters.q ||
     state.filters.assigneeId ||
     state.filters.priority ||
-    state.filters.type
+    state.filters.type ||
+    (state.filters.status && state.filters.status !== 'open')
   );
 }
 
@@ -204,6 +210,7 @@ function populateFilters({ resetValues = true } = {}) {
   const assignee = $('#filter-assignee');
   const priority = $('#filter-priority');
   const type = $('#filter-type');
+  const status = $('#filter-status');
 
   const signature = state.members.map((member) => `${member.id}:${member.name}`).join('|');
   if (assignee.dataset.signature !== signature && state.members.length) {
@@ -232,11 +239,32 @@ function populateFilters({ resetValues = true } = {}) {
         .map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`)
         .join('');
   }
+  // 任务状态筛选：默认「未完成」，支持「全部状态」与各看板列
+  const statuses = state.meta.statuses ?? [];
+  const statusSignature = statuses.map((column) => `${column.id}:${column.name}`).join('|');
+  if (status.dataset.signature !== statusSignature) {
+    status.dataset.signature = statusSignature;
+    status.innerHTML =
+      '<option value="open">未完成</option>' +
+      '<option value="">全部状态</option>' +
+      statuses
+        .map((column) => `<option value="${column.id}">${escapeHtml(column.name)}</option>`)
+        .join('');
+    // 筛选指向的列已被删除时回退到默认「未完成」
+    if (
+      state.filters.status &&
+      state.filters.status !== 'open' &&
+      !statuses.some((column) => column.id === state.filters.status)
+    ) {
+      state.filters.status = 'open';
+    }
+  }
   if (!resetValues) return;
 
   assignee.value = state.filters.assigneeId;
   priority.value = state.filters.priority;
   type.value = state.filters.type;
+  status.value = state.filters.status ?? 'open';
   $('#search-input').value = state.filters.q;
 }
 
@@ -279,6 +307,7 @@ function bindShell() {
     setFilter('priority', event.target.value),
   );
   $('#filter-type').addEventListener('change', (event) => setFilter('type', event.target.value));
+  $('#filter-status').addEventListener('change', (event) => setFilter('status', event.target.value));
 
   $('#clear-filters').addEventListener('click', () => {
     clearFilters();
