@@ -3880,3 +3880,8 @@ select {
   will-change: transform;
 }
 
+
+/* 标题输入框保底高度：防止隐藏态测高为 0 时被压成一条线 */
+.d-title {
+  min-height: 1.5em;
+}
