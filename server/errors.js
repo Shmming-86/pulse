@@ -79,6 +79,25 @@ export function createValidator() {
       }
       return num;
     },
+    /** 小数（用于工时）：保留 precision 位小数，超出范围报错 */
+    decimal(value, field, { min = 0, max = 999, precision = 1, optional = true } = {}) {
+      if (value === undefined || value === null || value === '') {
+        if (!optional) issues.push({ field, message: '必填' });
+        return null;
+      }
+      const num = typeof value === 'number' ? value : Number(value);
+      if (!Number.isFinite(num)) {
+        issues.push({ field, message: `必须是 ${min}~${max} 之间的数字` });
+        return null;
+      }
+      const factor = 10 ** precision;
+      const rounded = Math.round(num * factor) / factor;
+      if (rounded < min || rounded > max) {
+        issues.push({ field, message: `必须是 ${min}~${max} 之间的数字` });
+        return null;
+      }
+      return rounded;
+    },
     dateString(value, field, { optional = true } = {}) {
       if (value === undefined || value === null || value === '') {
         if (!optional) issues.push({ field, message: '必填' });

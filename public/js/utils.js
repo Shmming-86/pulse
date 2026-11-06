@@ -69,6 +69,55 @@ export function dueInfo(dueDate, isDone = false) {
   return { text: formatDate(`${dueDate}T00:00:00`), cls: 'chip' };
 }
 
+/** 工时数值 → 展示文本（整数不带小数，其余保留一位） */
+export function formatHours(value) {
+  if (value === null || value === undefined || value === '') return '';
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '';
+  return Number.isInteger(num) ? String(num) : String(Math.round(num * 10) / 10);
+}
+
+/**
+ * 工时摘要（卡片 / 列表 / 抽屉共用）：
+ * 同时有预估与实际时展示「实际/预估」，only 模式带前缀避免误读。
+ */
+export function hoursInfo(task) {
+  const est = task?.estimatedHours ?? null;
+  const act = task?.actualHours ?? null;
+  if (est === null && act === null) return null;
+  const diff = est !== null && act !== null ? Math.round((act - est) * 10) / 10 : null;
+  const parts = [];
+  if (est !== null) parts.push(`预估 ${formatHours(est)} 小时`);
+  if (act !== null) parts.push(`实际 ${formatHours(act)} 小时`);
+  if (diff !== null && diff !== 0) {
+    parts.push(diff > 0 ? `超出 ${formatHours(diff)} 小时` : `节省 ${formatHours(-diff)} 小时`);
+  }
+  const text =
+    act !== null && est !== null
+      ? `${formatHours(act)}/${formatHours(est)}h`
+      : act !== null
+        ? `${formatHours(act)}h`
+        : `估${formatHours(est)}h`;
+  return {
+    est,
+    act,
+    diff,
+    text,
+    title: parts.join(' · '),
+    over: diff !== null && diff > 0,
+    under: diff !== null && diff < 0,
+  };
+}
+
+/** 备注摘要：压成单行并截断，用于卡片与列表的悬停提示 */
+export function noteSummary(note, max = 120) {
+  const text = String(note ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return '';
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
 export function initials(name) {
   if (!name) return '?';
   return Array.from(name.trim())[0] ?? '?';
@@ -120,6 +169,7 @@ const ICONS = {
     '<circle cx="10" cy="7.2" r="3.1"/><path d="M4.4 16.2c.6-2.6 2.9-4.1 5.6-4.1s5 1.5 5.6 4.1" stroke-linecap="round"/>',
   mail:
     '<rect x="3" y="5" width="14" height="10" rx="2"/><path d="M3.6 6.2l6.4 4.6 6.4-4.6" stroke-linecap="round" stroke-linejoin="round"/>',
+  note: '<path d="M5.5 3.5h6l3 3v10h-9z" stroke-linejoin="round"/><path d="M8 9.2h4M8 12.2h4" stroke-linecap="round"/>',
 };
 
 /** 24 栅格图标（Lucide 几何）：必须用 viewBox 24 + stroke 2，否则会被裁切 */

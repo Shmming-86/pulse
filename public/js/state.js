@@ -149,6 +149,7 @@ export function filteredTasks() {
       task.title.toLowerCase().includes(needle) ||
       task.key.toLowerCase().includes(needle) ||
       (task.description ?? '').toLowerCase().includes(needle) ||
+      (task.note ?? '').toLowerCase().includes(needle) ||
       task.labels.some((label) => label.toLowerCase().includes(needle))
     );
   });

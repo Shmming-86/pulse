@@ -4,12 +4,15 @@ import { transaction } from '../db/database.js';
 const FIELD_MAP = {
   title: 'title',
   description: 'description',
+  note: 'note',
   status: 'status_id',
   type: 'type',
   priority: 'priority',
   assigneeId: 'assignee_id',
   reporterId: 'reporter_id',
   estimate: 'estimate',
+  estimatedHours: 'estimated_hours',
+  actualHours: 'actual_hours',
   difficulty: 'difficulty',
   dueDate: 'due_date',
   position: 'position',
@@ -27,6 +30,7 @@ function mapTask(row, extras) {
     projectId: row.project_id,
     title: row.title,
     description: row.description,
+    note: row.note ?? '',
     status: row.status_id,
     type: row.type,
     priority: row.priority,
@@ -34,6 +38,8 @@ function mapTask(row, extras) {
     reporterId: row.reporter_id ?? null,
     labels: extras.labels,
     estimate: row.estimate ?? null,
+    estimatedHours: row.estimated_hours ?? null,
+    actualHours: row.actual_hours ?? null,
     difficulty: row.difficulty ?? null,
     dueDate: row.due_date ?? null,
     subtasks: extras.subtasks,
@@ -124,11 +130,11 @@ export function createTaskRepo(db) {
       if (q) {
         const like = `%${escapeLike(q.toLowerCase())}%`;
         where.push(
-          `(lower(t.title) LIKE ? ESCAPE '\\' OR lower(t.task_key) LIKE ? ESCAPE '\\' OR lower(t.description) LIKE ? ESCAPE '\\' OR EXISTS (
+          `(lower(t.title) LIKE ? ESCAPE '\\' OR lower(t.task_key) LIKE ? ESCAPE '\\' OR lower(t.description) LIKE ? ESCAPE '\\' OR lower(t.note) LIKE ? ESCAPE '\\' OR EXISTS (
              SELECT 1 FROM task_labels l WHERE l.task_id = t.id AND lower(l.name) LIKE ? ESCAPE '\\'
            ))`,
         );
-        params.push(like, like, like, like);
+        params.push(like, like, like, like, like);
       }
       const sql = `SELECT t.* FROM tasks t
         JOIN board_columns c ON c.id = t.status_id
@@ -152,10 +158,10 @@ export function createTaskRepo(db) {
         const seq = Number(String(task.key).split('-').pop()) || 0;
         db.prepare(
           `INSERT INTO tasks
-             (id, seq, task_key, project_id, title, description, status_id, type, priority,
-              assignee_id, reporter_id, estimate, difficulty, due_date, position,
+             (id, seq, task_key, project_id, title, description, note, status_id, type, priority,
+              assignee_id, reporter_id, estimate, estimated_hours, actual_hours, difficulty, due_date, position,
               created_at, updated_at, started_at, completed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
           task.id,
           seq,
@@ -163,12 +169,15 @@ export function createTaskRepo(db) {
           task.projectId,
           task.title,
           task.description ?? '',
+          task.note ?? '',
           task.status,
           task.type,
           task.priority,
           task.assigneeId ?? null,
           task.reporterId ?? null,
           task.estimate ?? null,
+          task.estimatedHours ?? null,
+          task.actualHours ?? null,
           task.difficulty ?? null,
           task.dueDate ?? null,
           task.order ?? 0,

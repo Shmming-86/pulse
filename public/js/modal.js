@@ -156,6 +156,16 @@ export function openTaskModal({ defaultStatus = null, onCreated } = {}) {
           </select>
         </label>
       </div>
+      <div class="field-row two">
+        <label class="field">
+          <span>预估工时（小时）</span>
+          <input type="number" name="estimatedHours" min="0" max="999" step="0.5" inputmode="decimal" placeholder="如 8" />
+        </label>
+        <label class="field">
+          <span>实际工时（小时）</span>
+          <input type="number" name="actualHours" min="0" max="999" step="0.5" inputmode="decimal" placeholder="可稍后补填" />
+        </label>
+      </div>
       <div class="field">
         <span>标签</span>
         <div class="label-picker" data-label-picker>
@@ -179,6 +189,10 @@ export function openTaskModal({ defaultStatus = null, onCreated } = {}) {
         </div>
         <textarea name="description" rows="3" maxlength="5000" placeholder="支持 Markdown：**粗体**、- 列表、\`代码\`、[链接](https://example.com)"></textarea>
         <div class="md-body md-preview" data-desc-preview hidden></div>
+      </div>
+      <div class="field">
+        <span>备注</span>
+        <textarea name="note" rows="2" maxlength="2000" placeholder="任务相关情况：背景、阻塞、依赖、验收要点…"></textarea>
       </div>
     </form>
     <div class="modal-foot">
@@ -271,6 +285,17 @@ export function openTaskModal({ defaultStatus = null, onCreated } = {}) {
             titleInput.focus();
             return;
           }
+          const hours = ['estimatedHours', 'actualHours'].map((field) => {
+            const raw = form.elements[field].value.trim();
+            if (!raw) return null;
+            const value = Number(raw);
+            return Number.isFinite(value) ? Math.round(value * 10) / 10 : null;
+          });
+          if (hours.some((value) => value !== null && (value < 0 || value > 999))) {
+            errorEl.hidden = false;
+            errorEl.textContent = '工时需为 0~999 之间的数字';
+            return;
+          }
           errorEl.hidden = true;
           const submitBtn = modal.querySelector('[data-submit]');
           submitBtn.disabled = true;
@@ -285,6 +310,9 @@ export function openTaskModal({ defaultStatus = null, onCreated } = {}) {
               assigneeId: form.elements.assigneeId.value || null,
               dueDate: form.elements.dueDate.value || null,
               difficulty: form.elements.difficulty.value || null,
+              estimatedHours: hours[0],
+              actualHours: hours[1],
+              note: form.elements.note.value.trim(),
               labels: [...selectedLabels],
               description: form.elements.description.value,
             });
