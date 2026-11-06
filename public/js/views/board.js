@@ -22,7 +22,7 @@ import { toast } from '../toast.js';
 import { openTaskDrawer } from '../drawer.js';
 import { openAssigneePicker } from '../assignee.js';
 import { openColumnDeleteDialog, openColumnModal } from '../modal.js';
-import { avatarHtml, dueInfo, escapeHtml, icon, typeIconName } from '../utils.js';
+import { avatarHtml, dueInfo, escapeHtml, hoursInfo, icon, noteSummary, typeIconName } from '../utils.js';
 
 let suppressClick = false;
 let draggedId = null;
@@ -56,6 +56,8 @@ function cardHtml(task) {
   const visibleLabels = task.labels.slice(0, 2);
   const restLabels = task.labels.length - visibleLabels.length;
   const assigneeName = member ? `${member.name} · ${member.role}` : '未指派';
+  const hours = hoursInfo(task);
+  const note = noteSummary(task.note, 90);
 
   return `<article class="card" draggable="true" data-task-id="${task.id}" data-priority="${task.priority}">
     <header class="card-head">
@@ -99,6 +101,23 @@ function cardHtml(task) {
           : ''
       }
       <span class="foot-right">
+        ${
+          note
+            ? `<span class="card-note" title="备注：${escapeHtml(note)}" aria-label="有备注">${icon(
+                'note',
+                12,
+              )}</span>`
+            : ''
+        }
+        ${
+          hours
+            ? `<span class="card-hours ${hours.over ? 'over' : ''}" title="${escapeHtml(
+                hours.title,
+              )}" aria-label="工时：${escapeHtml(hours.title)}">${icon('clock', 12)}${escapeHtml(
+                hours.text,
+              )}</span>`
+            : ''
+        }
         ${
           task.subtasks.length
             ? `<span class="sub-progress" title="子项完成度 ${doneSubtasks}/${task.subtasks.length}">${icon(

@@ -75,6 +75,21 @@ const LABEL_GROUPS = [
   ['安全'],
 ];
 
+/** 备注模板：演示数据里让「备注」有真实感的样例 */
+const NOTE_TEMPLATES = [
+  '已与客户确认：本期只做主流程，批量操作下期再评估。',
+  '依赖后端接口联调，接口文档见协作空间；联调前先用 mock 数据推进。',
+  '复现步骤：1. 打开看板 2. 快速拖动卡片 3. 松手后顺序错位，Chrome 最新版可稳定复现。',
+  '验收要点：空态、加载态、错误态三种场景都要有明确提示文案。',
+  '决策记录：先上线最小可用版本，埋点验证后再决定是否做高级筛选。',
+  '注意：改动涉及历史数据，需同步迁移脚本并回归累计流图口径。',
+];
+
+/** 难度 → 预估工时基准（演示数据用，实际填写由用户决定） */
+const HOURS_BY_DIFFICULTY = { easy: 2, normal: 4, hard: 8, xhard: 12 };
+
+const round1 = (value) => Math.round(value * 10) / 10;
+
 function pick(rand, list) {
   return list[Math.floor(rand() * list.length)];
 }
@@ -198,12 +213,19 @@ export function buildSeedData(now = Date.now()) {
       done: status === 'done' ? true : rand() > 0.55,
     }));
 
+    // 工时：预估按难度基准浮动；未开始的任务不填实际工时，其余按 0.6~1.5 倍实际投入模拟偏差
+    const estimatedHours = round1((HOURS_BY_DIFFICULTY[difficulty] ?? 4) + pick(rand, [0, 0, 1, 2]));
+    const actualHours =
+      status === 'todo' ? null : round1(Math.max(0.5, estimatedHours * (0.6 + rand() * 0.9)));
+    const note = rand() > 0.55 ? pick(rand, NOTE_TEMPLATES) : '';
+
     tasks.push({
       id,
       key,
       projectId: PROJECT.id,
       title,
       description: pick(rand, DESCRIPTION_TEMPLATES),
+      note,
       status,
       type,
       priority,
@@ -211,6 +233,8 @@ export function buildSeedData(now = Date.now()) {
       reporterId: reporter.id,
       labels,
       difficulty,
+      estimatedHours,
+      actualHours,
       dueDate,
       subtasks,
       order: orderCounter[status]++,

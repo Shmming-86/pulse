@@ -181,6 +181,17 @@ const MIGRATIONS = [
       );
     },
   },
+  {
+    version: 5,
+    name: 'task_note_and_hours',
+    up(db) {
+      // 备注：任务相关情况的自由文本（纯文本，可多行）
+      db.exec("ALTER TABLE tasks ADD COLUMN note TEXT NOT NULL DEFAULT ''");
+      // 工时（小时）：预估用于评估、实际用于复盘偏差；未填写保持 NULL，便于统计时区分「0 小时」与「未填」
+      db.exec('ALTER TABLE tasks ADD COLUMN estimated_hours REAL');
+      db.exec('ALTER TABLE tasks ADD COLUMN actual_hours REAL');
+    },
+  },
 ];
 
 const PRAGMAS = [

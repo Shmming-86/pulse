@@ -3885,3 +3885,220 @@ select {
 .d-title {
   min-height: 1.5em;
 }
+
+/* ============================================================
+   v1.18：任务备注与工时（预估 / 实际）
+   ============================================================ */
+
+/* ---- 抽屉：备注 ---- */
+.d-note {
+  width: 100%;
+  min-height: 76px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 12.6px;
+  line-height: 1.65;
+  resize: vertical;
+  transition: border-color 0.14s ease, background 0.14s ease, box-shadow 0.14s ease;
+}
+
+.d-note::placeholder {
+  color: var(--text-3);
+}
+
+.d-note:hover {
+  border-color: var(--border-strong);
+}
+
+.d-note:focus {
+  outline: none;
+  background: var(--surface);
+  border-color: var(--accent, #5b5bd6);
+  box-shadow: 0 0 0 3px rgba(91, 91, 214, 0.1);
+}
+
+/* ---- 抽屉：工时 ---- */
+.hours-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.hours-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 9px;
+  background: var(--surface-2);
+  border-radius: 6px;
+}
+
+.hours-cell span {
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+
+.hours-cell input {
+  width: 100%;
+  height: 28px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hours-cell input::placeholder {
+  color: var(--text-3);
+}
+
+.hours-cell input:hover {
+  border-color: var(--border-strong);
+}
+
+.hours-cell input:focus {
+  outline: none;
+  border-color: var(--accent, #5b5bd6);
+  box-shadow: 0 0 0 3px rgba(91, 91, 214, 0.12);
+}
+
+.hours-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.hours-track {
+  flex: 1;
+  height: 5px;
+  background: var(--surface-3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.hours-track i {
+  display: block;
+  height: 100%;
+  background: var(--accent, #5b5bd6);
+  border-radius: 4px;
+  transition: width 0.2s ease;
+}
+
+.hours-bar.over .hours-track i {
+  background: #e5484d;
+}
+
+.hours-text {
+  font-size: 10.5px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hours-bar.over .hours-text {
+  color: #b91c1c;
+}
+
+.hours-note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/* ---- 卡片：备注指示 + 工时徽标 ---- */
+.card-note {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-3);
+}
+
+.card-note svg {
+  width: 12px;
+  height: 12px;
+}
+
+.card-hours {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  font-weight: 550;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.card-hours svg {
+  width: 11px;
+  height: 11px;
+  opacity: 0.7;
+}
+
+.card-hours.over {
+  color: #b91c1c;
+}
+
+/* ---- 列表：工时列 + 备注指示 + 汇总 ---- */
+.cell-hours {
+  font-size: 11.5px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cell-hours.over {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.t-note {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 5px;
+  color: var(--text-3);
+  vertical-align: -1px;
+}
+
+.t-note svg {
+  width: 11px;
+  height: 11px;
+}
+
+.list-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 4px 0;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.list-foot .hours-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.list-foot .hours-summary b {
+  font-weight: 620;
+}
+
+.list-foot .hours-summary .delta-up {
+  color: #b91c1c;
+}
+
+.list-foot .hours-summary .delta-down {
+  color: #12866f;
+}

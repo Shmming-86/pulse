@@ -8,6 +8,9 @@ const priorityName = (id) => PRIORITIES.find((p) => p.id === id)?.name ?? id;
 const typeName = (id) => TYPES.find((t) => t.id === id)?.name ?? id;
 const difficultyName = (id) => DIFFICULTIES.find((d) => d.id === id)?.name ?? '未评估';
 
+/** 工时文案：空值显示「未填写」，有值带单位（避免 0 与未填混淆） */
+const hoursText = (value) => (value === null || value === undefined ? '未填写' : `${value} 小时`);
+
 /** ISO 时间转本地「YYYY-MM-DD HH:mm」，用于活动文案（服务端时区即团队时区） */
 function formatLocal(iso) {
   if (!iso) return '未设置';
@@ -70,6 +73,17 @@ export function createTaskService({ tasks, members, columns, activity, project, 
     }
     if (!partial || input.description !== undefined) {
       out.description = v.optionalString(input.description, 'description', { max: 5000 });
+    }
+    // 备注：纯文本，用于补充任务相关情况（背景、阻塞、决策、验收要点）
+    if (!partial || input.note !== undefined) {
+      out.note = v.optionalString(input.note, 'note', { max: 2000 });
+    }
+    // 工时：单位小时，允许 1 位小数；null / 空串表示未填写
+    if (!partial || input.estimatedHours !== undefined) {
+      out.estimatedHours = v.decimal(input.estimatedHours, 'estimatedHours', { min: 0, max: 999 });
+    }
+    if (!partial || input.actualHours !== undefined) {
+      out.actualHours = v.decimal(input.actualHours, 'actualHours', { min: 0, max: 999 });
     }
     if (!partial || input.type !== undefined) {
       // type/priority/status 都有默认值，缺省不应报错；但传了非法值仍要拦截
@@ -146,6 +160,7 @@ export function createTaskService({ tasks, members, columns, activity, project, 
           projectId: currentProject.id,
           title: data.title,
           description: data.description ?? '',
+          note: data.note ?? '',
           status: data.status,
           type: data.type,
           priority: data.priority,
@@ -153,6 +168,8 @@ export function createTaskService({ tasks, members, columns, activity, project, 
           reporterId: actorId,
           labels: data.labels ?? [],
           difficulty: data.difficulty ?? null,
+          estimatedHours: data.estimatedHours ?? null,
+          actualHours: data.actualHours ?? null,
           dueDate: data.dueDate ?? null,
           subtasks: [],
           order: tasks.countInColumn(data.status),
@@ -223,7 +240,16 @@ export function createTaskService({ tasks, members, columns, activity, project, 
         }
 
         const fields = {};
-        for (const field of ['title', 'description', 'type', 'priority', 'difficulty', 'dueDate', 'assigneeId']) {
+        for (const field of [
+          'title',
+          'description',
+          'note',
+          'type',
+          'priority',
+          'difficulty',
+          'dueDate',
+          'assigneeId',
+        ]) {
           if (data[field] === undefined) continue;
           const before = task[field];
           const after = data[field];
@@ -253,6 +279,32 @@ export function createTaskService({ tasks, members, columns, activity, project, 
           }
         }
         if (Object.keys(fields).length) tasks.update(id, { ...fields, updatedAt: now });
+
+        // 工时：预估 / 实际分别记录变更，便于回溯「评估是否准确」
+        const hourFields = [
+          ['estimatedHours', '预估工时'],
+          ['actualHours', '实际工时'],
+        ];
+        const hourPatch = {};
+        for (const [field, label] of hourFields) {
+          if (data[field] === undefined) continue;
+          const before = task[field] ?? null;
+          const after = data[field] ?? null;
+          if (before === after) continue;
+          hourPatch[field] = after;
+          tasks.addHistory(id, {
+            at: now,
+            field,
+            from: before === null ? null : String(before),
+            to: after === null ? null : String(after),
+            actorId,
+          });
+          changes.push({
+            type: 'update',
+            message: `${actorName(actorId)} 将${label}调整为 ${hoursText(after)}`,
+          });
+        }
+        if (Object.keys(hourPatch).length) tasks.update(id, { ...hourPatch, updatedAt: now });
 
         // 开始 / 完成时间的手工修正（写入历史，抽屉里能追溯改了什么）
         const timeFields = [

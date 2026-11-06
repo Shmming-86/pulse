@@ -1,5 +1,6 @@
 import {
   addSubtask,
+  difficultyMeta,
   memberById,
   priorityMeta,
   removeSubtask,
@@ -11,7 +12,7 @@ import {
   typeMeta,
   updateTask,
 } from './state.js';
-import { escapeHtml, formatDateTime, icon, relativeTime, typeIconName } from './utils.js';
+import { escapeHtml, formatDateTime, formatHours, hoursInfo, icon, relativeTime, typeIconName } from './utils.js';
 import { renderMarkdown } from './markdown.js';
 import { toast } from './toast.js';
 import { confirmDialog } from './modal.js';
@@ -64,8 +65,27 @@ export function openTaskDrawer(id, { onClose } = {}) {
   document.body.style.overflow = 'hidden';
 }
 
+/**
+ * 关闭前把还在输入框里、尚未失焦的文本改动落库。
+ * 否则用户打完备注直接按 Esc / 点遮罩，内容会因为 blur 处理器在关闭后查不到任务而丢失。
+ */
+function flushPendingEdits() {
+  const task = openId ? taskById(openId) : null;
+  if (!task) return;
+  const panel = drawerEl();
+  for (const field of ['title', 'description', 'note']) {
+    const input = panel.querySelector(`[data-field="${field}"]`);
+    if (!input || input.hidden) continue;
+    const value = input.value.trim();
+    if (field === 'title' && !value) continue;
+    if (value === (task[field] ?? '')) continue;
+    updateTask(task.id, { [field]: value }).catch(() => {});
+  }
+}
+
 export function closeTaskDrawer() {
   if (!openId) return;
+  flushPendingEdits();
   openId = null;
   const overlay = backdropEl();
   const panel = drawerEl();
@@ -115,6 +135,17 @@ function render() {
   const percent = task.subtasks.length ? Math.round((doneSubtasks / task.subtasks.length) * 100) : 0;
   const described = task.description?.trim() ? renderMarkdown(task.description) : '';
   const labelPool = [...new Set([...state.labels, ...task.labels])];
+  const noteText = task.note ?? '';
+  const hours = hoursInfo(task);
+  const hoursPercent =
+    hours && hours.est ? Math.min(100, Math.round(((hours.act ?? 0) / hours.est) * 100)) : 0;
+  const hoursHeadText = hours
+    ? hours.act !== null && hours.est !== null
+      ? `实际 ${formatHours(hours.act)} / 预估 ${formatHours(hours.est)} 小时`
+      : hours.act !== null
+        ? `实际 ${formatHours(hours.act)} 小时`
+        : `预估 ${formatHours(hours.est)} 小时`
+    : '未填写';
 
   panel.innerHTML = `<header class="drawer-head">
     <span class="card-type drawer-type" style="color:${type.color};background:${type.color}18" title="任务类型：${escapeHtml(
@@ -233,6 +264,17 @@ function render() {
 
     <section class="d-section">
       <div class="d-section-head">
+        <h4>备注</h4>
+        <span class="count" data-note-count>${noteText.trim() ? `${noteText.trim().length} 字` : '未填写'}</span>
+      </div>
+      <textarea class="d-note" rows="3" maxlength="2000" data-field="note" placeholder="记录任务相关情况：背景、阻塞、依赖、决策、验收要点…">${escapeHtml(
+        noteText,
+      )}</textarea>
+      <p class="md-hint">失焦自动保存 · 纯文本，支持多行（最多 2000 字）</p>
+    </section>
+
+    <section class="d-section">
+      <div class="d-section-head">
         <h4>子项</h4>
         <span class="count">${doneSubtasks}/${task.subtasks.length}</span>
       </div>
@@ -288,6 +330,46 @@ function render() {
     </section>
 
     <section class="d-section">
+      <div class="d-section-head">
+        <h4>工时</h4>
+        <span class="count">${escapeHtml(hoursHeadText)}</span>
+      </div>
+      <div class="hours-grid">
+        <label class="hours-cell">
+          <span>预估工时（小时）</span>
+          <input type="number" min="0" max="999" step="0.5" inputmode="decimal"
+            data-field="estimatedHours" value="${task.estimatedHours ?? ''}"
+            placeholder="未填写" aria-label="预估工时（小时）" />
+        </label>
+        <label class="hours-cell">
+          <span>实际工时（小时）</span>
+          <input type="number" min="0" max="999" step="0.5" inputmode="decimal"
+            data-field="actualHours" value="${task.actualHours ?? ''}"
+            placeholder="未填写" aria-label="实际工时（小时）" />
+        </label>
+      </div>
+      ${
+        hours && hours.est !== null
+          ? `<div class="hours-bar ${hours.over ? 'over' : ''}">
+              <div class="hours-track"><i style="width:${hoursPercent}%"></i></div>
+              <span class="hours-text">${
+                hours.act === null
+                  ? '尚未记录实际工时'
+                  : hours.diff === 0
+                    ? '与预估持平'
+                    : hours.diff > 0
+                      ? `超出 ${formatHours(hours.diff)} 小时`
+                      : `比预估少 ${formatHours(-hours.diff)} 小时`
+              }</span>
+            </div>`
+          : hours
+            ? `<p class="hours-note">已记录实际 ${formatHours(hours.act)} 小时，补齐预估工时后可直接看偏差。</p>`
+            : '<p class="hours-note">填写预估与实际工时，便于评估投入与复盘偏差。</p>'
+      }
+      <p class="time-hint">单位小时，可填 0.5 的倍数；留空表示未填写，保存后写入活动记录。</p>
+    </section>
+
+    <section class="d-section">
       <div class="d-section-head"><h4>活动记录</h4></div>
       <div class="d-activity">
         ${(task.history ?? [])
@@ -308,7 +390,13 @@ function render() {
                     ? `${actor?.name ?? '系统'} 将开始时间设为 ${entry.to ? formatDateTime(entry.to) : '未设置'}`
                     : entry.field === 'completedAt'
                       ? `${actor?.name ?? '系统'} 将完成时间设为 ${entry.to ? formatDateTime(entry.to) : '未设置'}`
-                      : `状态由「${fromName}」变更为「${toName}」`;
+                      : entry.field === 'difficulty'
+                        ? `${actor?.name ?? '系统'} 将难度调整为「${difficultyMeta(entry.to).name}」`
+                        : entry.field === 'estimatedHours' || entry.field === 'actualHours'
+                          ? `${actor?.name ?? '系统'} 将${
+                              entry.field === 'estimatedHours' ? '预估工时' : '实际工时'
+                            }调整为 ${entry.to === null ? '未填写' : `${formatHours(entry.to)} 小时`}`
+                          : `状态由「${fromName}」变更为「${toName}」`;
             return `<div class="act-row">
               <span class="act-dot"></span>
               <div>${escapeHtml(text)}<span class="act-time">${escapeHtml(
@@ -445,6 +533,15 @@ function ensureBound() {
     button.textContent = '预览';
   });
 
+  // 备注：输入时实时更新字数（落库仍在失焦时进行）
+  panel.addEventListener('input', (event) => {
+    if (!event.target.matches?.('[data-field="note"]')) return;
+    const count = panel.querySelector('[data-note-count]');
+    if (!count) return;
+    const length = event.target.value.trim().length;
+    count.textContent = length ? `${length} 字` : '未填写';
+  });
+
   panel.addEventListener('change', async (event) => {
     const task = taskById(openId);
     if (!task) return;
@@ -478,8 +575,29 @@ function ensureBound() {
     const field = event.target.closest('[data-field]');
     if (!field) return;
     const name = field.dataset.field;
+
+    // 工时：单位小时，允许一位小数；留空表示清空（与「0 小时」区分）
+    if (name === 'estimatedHours' || name === 'actualHours') {
+      const raw = field.value.trim();
+      const next = raw === '' ? null : Math.round(Number(raw) * 10) / 10;
+      if (raw !== '' && (!Number.isFinite(next) || next < 0 || next > 999)) {
+        toast('工时需为 0~999 之间的数字', 'error');
+        refreshDrawer();
+        return;
+      }
+      if (next === (task[name] ?? null)) return;
+      try {
+        await updateTask(task.id, { [name]: next });
+        toast(name === 'estimatedHours' ? '预估工时已更新' : '实际工时已更新', 'success', 1600);
+      } catch (error) {
+        toast(error.message, 'error');
+        refreshDrawer();
+      }
+      return;
+    }
+
     // 标题与描述由 blur 处理，避免 change 与 blur 重复提交
-    if (name === 'title' || name === 'description') return;
+    if (name === 'title' || name === 'description' || name === 'note') return;
     let value = field.value;
     if (name === 'difficulty') value = value === '' ? null : value;
     if (name === 'assigneeId') value = value === '' ? null : value;
@@ -562,7 +680,7 @@ function ensureBound() {
       const field = event.target.closest?.('[data-field]');
       if (!field) return;
       const name = field.dataset.field;
-      if (!['title', 'description'].includes(name)) return;
+      if (!['title', 'description', 'note'].includes(name)) return;
       const value = field.value.trim();
       if (name === 'title' && !value) {
         field.value = task.title;
@@ -579,7 +697,8 @@ function ensureBound() {
         refreshDrawer();
         return;
       }
-      if (name === 'description') refreshDrawer();
+      // 描述保存后切回预览；备注保存后同步字数与卡片指示
+      if (name === 'description' || name === 'note') refreshDrawer();
     },
     true,
   );
